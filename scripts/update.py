@@ -356,6 +356,7 @@ def odds_update(sport, with_scores, test=False):
 # played earlier this season are filled in from ESPN's public feeds (DraftKings
 # opening and closing lines). ESPN blocks bursts of requests from cloud
 # servers, so this goes slowly and only does a limited number per run.
+ESPN_BUDGET = int(os.environ.get("ESPN_BUDGET", "250"))  # ESPN odds requests per morning run
 ESPN_SB = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates={d}"
 ESPN_ODDS = "https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/events/{e}/competitions/{c}/odds"
 
@@ -413,88 +414,183 @@ def espn_lines(item):
                 d[k] = None
     return o, c
 
-def nba_catchup(track, state, max_games=90, test=False):
-    season = season_of("NBA", TODAY)
-    done = set(state.setdefault("nba_catchup", {}).get(str(season), []))
-    have = {(e.get("date"), e.get("home")) for e in track["events"].values() if e.get("last")}
-    d, end = date(season, 10, 15), TODAY - timedelta(days=1)
-    fetched, added, blocked = 0, 0, False
-    while d <= end and fetched < max_games and not blocked:
-        key = d.strftime("%Y%m%d")
-        if key in done:
-            d += timedelta(days=1)
+class EspnRefused(Exception):
+    pass
+
+def espn_day(key):
+    """Finished NBA games on one date (YYYYMMDD) from ESPN's scoreboard."""
+    sb = http_json(ESPN_SB.format(d=key))
+    time.sleep(1.5)
+    out = []
+    for ev in (sb or {}).get("events", []):
+        comp = (ev.get("competitions") or [{}])[0]
+        if _dig(comp, "status", "type", "completed") is not True or _dig(ev, "season", "type") not in (2, 3, 5):
+            continue
+        cs = comp.get("competitors", [])
+        hc = next((c for c in cs if c.get("homeAway") == "home"), None)
+        ac = next((c for c in cs if c.get("homeAway") == "away"), None)
+        if not hc or not ac:
             continue
         try:
-            sb = http_json(ESPN_SB.format(d=key))
-        except RuntimeError as e:
-            say(f"  ! ESPN scoreboard {key}: {e}")
-            break
-        time.sleep(1.5)
-        complete = True
-        for ev in (sb or {}).get("events", []):
-            if fetched >= max_games:
-                complete = False
-                break
-            comp = (ev.get("competitions") or [{}])[0]
-            if _dig(comp, "status", "type", "completed") is not True or _dig(ev, "season", "type") not in (2, 3, 5):
-                continue
-            cs = comp.get("competitors", [])
-            hc = next((c for c in cs if c.get("homeAway") == "home"), None)
-            ac = next((c for c in cs if c.get("homeAway") == "away"), None)
-            if not hc or not ac:
-                continue
-            home, away = _dig(hc, "team", "shortDisplayName"), _dig(ac, "team", "shortDisplayName")
-            gd = ymd(ev.get("date"))
-            if (gd, home) in have:
-                continue
+            hs, as_ = int(float(hc.get("score"))), int(float(ac.get("score")))
+        except (TypeError, ValueError):
+            continue
+        out.append({"id": str(ev["id"]), "cid": str(comp.get("id", ev["id"])), "date": ymd(ev.get("date")),
+                    "home": _dig(hc, "team", "shortDisplayName"), "away": _dig(ac, "team", "shortDisplayName"), "hs": hs, "as": as_,
+                    "post": _dig(ev, "season", "type") != 2, "neu": bool(comp.get("neutralSite"))})
+    return out
+
+def espn_game_lines(g):
+    """Best pregame provider's opening and closing lines for one game. Raises EspnRefused if ESPN says no."""
+    try:
+        js = http_json(ESPN_ODDS.format(e=g["id"], c=g["cid"]))
+    except RuntimeError as e:
+        raise EspnRefused(str(e))
+    time.sleep(1.5)
+    items = []
+    for it in (js or {}).get("items", []):
+        if isinstance(it, dict) and set(it) == {"$ref"}:
             try:
-                js = http_json(ESPN_ODDS.format(e=ev["id"], c=comp.get("id", ev["id"])))
-            except RuntimeError as e:
-                say(f"  ! ESPN odds request refused ({e}); stopping for today, will continue tomorrow")
-                blocked, complete = True, False
-                break
-            fetched += 1
-            time.sleep(1.5)
-            items = []
-            for it in (js or {}).get("items", []):
-                if isinstance(it, dict) and set(it) == {"$ref"}:
-                    try:
-                        it = http_json(it["$ref"].replace("http://", "https://")); time.sleep(1.5)
-                    except RuntimeError:
-                        continue
-                items.append(it)
-            best = None
-            for it in items:
-                name = (_dig(it, "provider", "name") or "").lower()
-                if "live" in name:
-                    continue
-                o, c = espn_lines(it)
-                score = (c["sp"] is not None) + (o["sp"] is not None) + (c["tot"] is not None)
-                if score and (best is None or score > best[0]):
-                    best = (score, o, c, _dig(it, "provider", "name"))
-            try:
-                hs, as_ = int(float(hc.get("score"))), int(float(ac.get("score")))
-            except (TypeError, ValueError):
-                hs = as_ = None
-            if test:
-                say(f"  sample {away} @ {home} {gd}: {json.dumps(best[1:] if best else None)} final {as_}-{hs}")
-                return track
-            if not best:
+                it = http_json(it["$ref"].replace("http://", "https://")); time.sleep(1.5)
+            except RuntimeError:
                 continue
-            _, o, c, book = best
-            track["events"][f"espn-{ev['id']}"] = {"date": gd, "home": home, "away": away, "hs": hs, "as": as_,
-                "open": {k: v for k, v in o.items() if v is not None} or None, "last": {k: v for k, v in c.items() if v is not None},
-                "src": f"ESPN ({book})"}
-            have.add((gd, home))
-            added += 1
-        if complete and not blocked:
-            done.add(key)
+        items.append(it)
+    best = None
+    for it in items:
+        if "live" in (_dig(it, "provider", "name") or "").lower():
+            continue
+        o, c = espn_lines(it)
+        score = (c["sp"] is not None) + (o["sp"] is not None) + (c["tot"] is not None) + (o["tot"] is not None)
+        if score and (best is None or score > best[0]):
+            best = (score, o, c, _dig(it, "provider", "name"))
+    return None if not best else (best[1], best[2], best[3])
+
+def _season_dates(season, end):
+    d = date(season, 10, 1)
+    last = min(end, date(season + 1, 6, 30))
+    while d <= last:
+        yield d
         d += timedelta(days=1)
+
+def nba_catchup(track, state, budget, test=False):
+    """This season: add ESPN's DraftKings opening/closing lines for finished games.
+    Games already tracked from The Odds API get ESPN's true opener and closer swapped in."""
+    season = season_of("NBA", TODAY)
+    done = set(state.setdefault("nba_catchup", {}).get(str(season), []))
+    by_key = {}
+    for eid, e in track["events"].items():
+        by_key[(e.get("date"), e.get("home"))] = e
+    used, added, upgraded = 0, 0, 0
+    end = TODAY - timedelta(days=1)
+    try:
+        for d in _season_dates(season, end):
+            key = d.strftime("%Y%m%d")
+            if key in done:
+                continue
+            complete = True
+            for g in espn_day(key):
+                e = by_key.get((g["date"], g["home"]))
+                if e and e.get("espn"):
+                    continue
+                if used >= budget:
+                    complete = False
+                    break
+                lines = espn_game_lines(g)
+                used += 1
+                if test:
+                    say(f"  sample this season {g['away']} @ {g['home']} {g['date']}: {json.dumps(lines)} final {g['as']}-{g['hs']}")
+                    return 0
+                if not lines:
+                    continue
+                o, c, book = lines
+                o = {k: v for k, v in o.items() if v is not None}
+                c = {k: v for k, v in c.items() if v is not None}
+                if e:
+                    if o:
+                        e["open"] = o
+                    if c:
+                        e["last"] = {**(e.get("last") or {}), **c}
+                    e["hs"], e["as"], e["espn"] = g["hs"], g["as"], True
+                    upgraded += 1
+                else:
+                    track["events"][f"espn-{g['id']}"] = {"date": g["date"], "home": g["home"], "away": g["away"], "hs": g["hs"], "as": g["as"],
+                        "open": o or None, "last": c, "espn": True, "src": f"ESPN ({book})"}
+                    by_key[(g["date"], g["home"])] = track["events"][f"espn-{g['id']}"]
+                    added += 1
+            if not complete:
+                break
+            done.add(key)
+    except EspnRefused as e:
+        say(f"  ! ESPN refused a request ({e}); stopping for today, continuing tomorrow")
+        used = budget
     state["nba_catchup"][str(season)] = sorted(done)
-    left = sum(1 for i in range((end - date(season, 10, 15)).days + 1)
-               if (date(season, 10, 15) + timedelta(days=i)).strftime("%Y%m%d") not in done)
-    say(f"  NBA catch-up from ESPN: {added} past games added ({fetched} odds requests); {left} days still to check")
-    return track
+    say(f"  NBA this season from ESPN: {added} games added, {upgraded} given true opening/closing lines ({used} requests)")
+    return max(0, budget - used)
+
+NBA_BACKFILL = (2025, 2024, 2023, 2022)  # 2025-26 back to 2022-23
+
+def nba_backfill(state, budget, test=False):
+    """Past seasons missing opening lines and moneylines: pull them from ESPN a few hundred games a day."""
+    prog = state.setdefault("nba_backfill", {})
+    used = 0
+    for season in NBA_BACKFILL:
+        info = prog.setdefault(str(season), {"done": [], "finished": False})
+        if info.get("finished") and not test:
+            continue
+        path = f"archive/NBA/{season}.json"
+        saved = load(path, {"games": []})
+        games = {g["id"]: g for g in saved["games"]}
+        done = set(info["done"])
+        end = min(TODAY - timedelta(days=1), date(season + 1, 6, 30))
+        try:
+            for d in _season_dates(season, end):
+                key = d.strftime("%Y%m%d")
+                if key in done:
+                    continue
+                if used >= budget:
+                    break
+                complete = True
+                for g in espn_day(key):
+                    if g["id"] in games:
+                        continue
+                    if used >= budget:
+                        complete = False
+                        break
+                    lines = espn_game_lines(g)
+                    used += 1
+                    if test:
+                        say(f"  sample {season}-{str(season+1)[-2:]} {g['away']} @ {g['home']} {g['date']}: {json.dumps(lines)} final {g['as']}-{g['hs']}")
+                        return
+                    if not lines:
+                        continue
+                    o, c, book = lines
+                    games[g["id"]] = {"id": g["id"], "date": g["date"], "season": season, "home": g["home"], "away": g["away"],
+                        "hs": g["hs"], "as": g["as"], "post": g["post"], "neu": g["neu"],
+                        "sp": c.get("sp"), "spO": o.get("sp"), "tot": c.get("tot"), "totO": o.get("tot"),
+                        "hml": c.get("hml"), "aml": c.get("aml"), "hso": c.get("hso"), "aso": c.get("aso"), "oo": c.get("oo"), "uo": c.get("uo")}
+                if not complete:
+                    break
+                done.add(key)
+                if test:
+                    continue
+                if len(done) % 5 == 0:
+                    save(path, {"sport": "NBA", "season": season, "source": "ESPN (DraftKings)", "updated": NOW.isoformat(timespec="seconds"),
+                                "games": [{k: v for k, v in g.items() if v is not None and v is not False} for g in games.values()]})
+            else:
+                info["finished"] = True
+        except EspnRefused as e:
+            say(f"  ! ESPN refused a request ({e}); stopping for today, continuing tomorrow")
+            used = budget
+        info["done"] = sorted(done)
+        if games and not test:
+            save(path, {"sport": "NBA", "season": season, "source": "ESPN (DraftKings)", "updated": NOW.isoformat(timespec="seconds"),
+                        "games": [{k: v for k, v in g.items() if v is not None and v is not False} for g in games.values()]})
+        withO = sum(1 for g in games.values() if g.get("spO") is not None)
+        if not test:
+            say(f"  NBA {season}-{str(season+1)[-2:]} from ESPN: {len(games)} games saved, {withO} with opening lines" + (" (season complete)" if info.get("finished") else ""))
+        if used >= budget:
+            break
+    return
 
 def nba_from_odds(track):
     """Turn tracked NBA events into season files (current season and on)."""
@@ -829,7 +925,8 @@ def main():
             tracks[sp] = guard(f"{sp} odds", lambda sp=sp: odds_update(sp, with_scores=(sp == "NBA" and not args.odds_only), test=args.test))
     if args.test:
         if "NBA" in sports:
-            guard("NBA catch-up test", lambda: nba_catchup(tracks.get("NBA") or {"events": {}}, {}, test=True))
+            guard("NBA catch-up test", lambda: nba_catchup(tracks.get("NBA") or {"events": {}}, {}, budget=5, test=True))
+            guard("NBA past-season test", lambda: nba_backfill({}, budget=5, test=True))
         if "NCAAF" in sports:
             guard("NCAAF test", lambda: pull_cfb_season(season_of("NCAAF", TODAY), test=True))
         if "NCAAB" in sports:
@@ -839,8 +936,10 @@ def main():
     if "NBA" in sports and not args.odds_only:
         if tracks.get("NBA") is None:
             tracks["NBA"] = load("odds/NBA.json", {"events": {}})
-        guard("NBA catch-up", lambda: nba_catchup(tracks["NBA"], state))
+        left = guard("NBA catch-up", lambda: nba_catchup(tracks["NBA"], state, budget=ESPN_BUDGET))
         save("odds/NBA.json", tracks["NBA"])
+        if left:
+            guard("NBA past seasons", lambda: nba_backfill(state, budget=left))
     if tracks.get("NBA"):
         guard("NBA season files", lambda: nba_from_odds(tracks["NBA"]))
     if "NFL" in sports and not args.odds_only:
