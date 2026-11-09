@@ -1,0 +1,61 @@
+name: Update betting data
+
+on:
+  schedule:
+    # 11:00 UTC = 6:00 AM Eastern (7:00 AM during daylight time)
+    - cron: "0 11 * * *"
+    # Second pass in the late afternoon to grab lines for tonight's games
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "full = refresh + backfill, refresh = recent/upcoming only, test = print a few parsed games, save nothing"
+        default: "full"
+        type: choice
+        options: [full, refresh, test]
+      sports:
+        description: "Sports to update"
+        default: "NFL,NCAAF,NBA,NCAAB"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run updater
+        env:
+          MODE: ${{ github.event.inputs.mode || (github.event.schedule == '0 21 * * *' && 'refresh' || 'full') }}
+          SPORTS: ${{ github.event.inputs.sports || 'NFL,NCAAF,NBA,NCAAB' }}
+        run: |
+          case "$MODE" in
+            test)    python scripts/update.py --sports "$SPORTS" --test ;;
+            refresh) python scripts/update.py --sports "$SPORTS" --no-backfill --max-minutes 60 ;;
+            *)       python scripts/update.py --sports "$SPORTS" --max-minutes 300 ;;
+          esac
+
+      - name: Save data
+        if: always() && (github.event.inputs.mode || 'full') != 'test'
+        run: |
+          git config user.name "betting-lab-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "No data changes."
+          else
+            git commit -m "Data update $(date -u +'%Y-%m-%d %H:%M') UTC"
+            git pull --rebase --autostash || true
+            git push
+          fi

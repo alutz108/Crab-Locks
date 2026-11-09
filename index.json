@@ -1,0 +1,25 @@
+{
+ "updated": "2026-11-09T15:08:14+00:00",
+ "sports": {
+  "NFL": {
+   "base": true,
+   "espn": [],
+   "coverage": {}
+  },
+  "NCAAF": {
+   "base": true,
+   "espn": [],
+   "coverage": {}
+  },
+  "NBA": {
+   "base": true,
+   "espn": [],
+   "coverage": {}
+  },
+  "NCAAB": {
+   "base": false,
+   "espn": [],
+   "coverage": {}
+  }
+ }
+}
