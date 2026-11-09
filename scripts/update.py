@@ -506,7 +506,7 @@ def nba_from_odds(track):
         if s < 2026:
             continue
         o, l = e.get("open") or {}, e.get("last") or {}
-        by.setdefault(s, []).append({"id": eid, "date": e["date"], "home": e["home"], "away": e["away"],
+        by.setdefault(s, []).append({"id": eid, "date": e["date"], "season": s, "home": e["home"], "away": e["away"],
             "hs": e.get("hs"), "as": e.get("as"), "sp": l.get("sp"), "spO": o.get("sp"), "tot": l.get("tot"), "totO": o.get("tot"),
             "hml": l.get("hml"), "aml": l.get("aml"), "hso": l.get("hso"), "aso": l.get("aso"), "oo": l.get("oo"), "uo": l.get("uo")})
     for s, games in by.items():
@@ -846,15 +846,16 @@ def main():
     if "NFL" in sports and not args.odds_only:
         guard("NFL rebuild", lambda: build_nfl_base(tracks.get("NFL")))
 
-    if not args.odds_only:
-        for sp, pull, first in (("NCAAF", pull_cfb_season, 2013), ("NCAAB", pull_cbb_season, 2013)):
+    for sp, pull, first in (("NCAAF", pull_cfb_season, 2013), ("NCAAB", pull_cbb_season, 2013)):
             if sp not in sports:
+                continue
+            if args.odds_only and sp != "NCAAB":
                 continue
             if not CFBD_KEY:
                 say(f"  {sp}: no CFBD_API_KEY, skipping")
                 continue
             cur = season_of(sp, TODAY)
-            todo = [cur] + [s for s in range(cur - 1, first - 1, -1) if s not in state["done"].get(sp, [])][:4]
+            todo = [cur] + ([] if args.odds_only else [s for s in range(cur - 1, first - 1, -1) if s not in state["done"].get(sp, [])][:4])
             for s in todo:
                 if s == cur:
                     fn = (lambda: pull_cfb_season(s, current=True)) if sp == "NCAAF" else (lambda: pull_cbb_recent(s))
