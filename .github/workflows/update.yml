@@ -9,10 +9,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "full = everything, odds = NBA/NFL lines snapshot only, test = print samples and save nothing"
+        description: "full = everything, odds = NBA/NFL lines snapshot only, test = print samples and save nothing, archive = one-time college archive import"
         default: "full"
         type: choice
-        options: [full, odds, test]
+        options: [full, odds, test, archive-test, archive]
 
 permissions:
   contents: write
@@ -40,12 +40,14 @@ jobs:
         run: |
           case "$MODE" in
             test) python scripts/update.py --test ;;
+            archive-test) python scripts/update.py --archive --test --sports NCAAF,NCAAB ;;
+            archive) python scripts/update.py --archive --sports NCAAF,NCAAB ;;
             odds) python scripts/update.py --sports NBA --odds-only ;;
             *)    python scripts/update.py ;;
           esac
 
       - name: Save data
-        if: always() && (github.event.inputs.mode || 'full') != 'test'
+        if: always() && (github.event.inputs.mode || 'full') != 'test' && github.event.inputs.mode != 'archive-test'
         run: |
           git config user.name "crab-locks-bot"
           git config user.email "actions@users.noreply.github.com"
