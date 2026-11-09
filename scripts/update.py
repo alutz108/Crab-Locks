@@ -593,14 +593,200 @@ def build_nfl_base(track):
     save("base/NFL.json", pack(games))
     say(f"  NFL rebuilt from nflverse: {len(games)} games; opening lines from the SBR archive on {n_sbr}, captured on {n_cap}")
 
+# ------------------------------------------------------------------ Sportsbook Review archive (via archive.org)
+# Sportsbook Review published season spreadsheets with opening and closing lines
+# until 2023. The site took them down, but the Internet Archive kept copies.
+# This one-time import downloads those copies, reads them, and saves games with
+# opening and closing spreads and totals, moneylines and final scores.
+import zipfile, re
+import xml.etree.ElementTree as ET_XML
+
+SBR_DIR = {"NCAAF": ("ncaafootball", "ncaa football"), "NCAAB": ("ncaabasketball", "ncaa basketball")}
+SBR_SEASONS = range(2007, 2022)  # 2007-08 through 2021-22
+
+def read_xlsx(blob):
+    z = zipfile.ZipFile(io.BytesIO(blob))
+    ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    shared = []
+    if "xl/sharedStrings.xml" in z.namelist():
+        for si in ET_XML.fromstring(z.read("xl/sharedStrings.xml")).iter(ns + "si"):
+            shared.append("".join(t.text or "" for t in si.iter(ns + "t")))
+    sheets = sorted(n for n in z.namelist() if n.startswith("xl/worksheets/sheet") and n.endswith(".xml"))
+    root = ET_XML.fromstring(z.read(sheets[0]))
+    out = []
+    for row in root.iter(ns + "row"):
+        cells = {}
+        for c in row.iter(ns + "c"):
+            ref = c.get("r", "")
+            letters = re.match(r"[A-Z]+", ref)
+            col = 0
+            for ch in (letters.group(0) if letters else ""):
+                col = col * 26 + (ord(ch) - 64)
+            t, v = c.get("t"), c.find(ns + "v")
+            if t == "s" and v is not None:
+                val = shared[int(v.text)]
+            elif t == "inlineStr":
+                val = "".join(x.text or "" for x in c.iter(ns + "t"))
+            elif v is not None and v.text is not None:
+                try:
+                    f = float(v.text); val = int(f) if f.is_integer() else f
+                except ValueError:
+                    val = v.text
+            else:
+                val = None
+            cells[col - 1] = val
+        if cells:
+            out.append([cells.get(i) for i in range(max(cells) + 1)])
+    return out
+
+def sbr_num(v):
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    t = str(v).strip().lower().replace("½", ".5")
+    if t in ("pk", "pick", "p"):
+        return 0.0
+    try:
+        return float(t)
+    except ValueError:
+        return None
+
+def tidy_name(n):
+    n = str(n).strip()
+    return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", n) if " " not in n else n
+
+def sbr_games(rows, sport, start):
+    hdr = [str(x or "").strip().lower() for x in rows[0]]
+    col = lambda name: hdr.index(name) if name in hdr else None
+    iD, iVH, iT, iF, iO, iC, iML = col("date"), col("vh"), col("team"), col("final"), col("open"), col("close"), col("ml")
+    if None in (iD, iVH, iT, iF, iO, iC):
+        raise RuntimeError(f"unexpected columns: {hdr}")
+    games, body, i = [], rows[1:], 0
+    get = lambda r, k: r[k] if k is not None and k < len(r) else None
+    while i + 1 < len(body):
+        v, h = body[i], body[i + 1]
+        vh1, vh2 = str(get(v, iVH) or "").upper(), str(get(h, iVH) or "").upper()
+        if vh1 not in ("V", "N") or vh2 not in ("H", "N"):
+            i += 1
+            continue
+        i += 2
+        d = sbr_num(get(v, iD))
+        vf, hf = sbr_num(get(v, iF)), sbr_num(get(h, iF))
+        if d is None or vf is None or hf is None:
+            continue
+        mm, dd = int(d) // 100, int(d) % 100
+        if not (1 <= mm <= 12 and 1 <= dd <= 31):
+            continue
+        yr = start if mm >= 7 else start + 1
+        vml, hml = sbr_num(get(v, iML)), sbr_num(get(h, iML))
+        if vml is not None and abs(vml) < 100: vml = None
+        if hml is not None and abs(hml) < 100: hml = None
+        g = {"date": yr * 10000 + mm * 100 + dd, "season": start, "home": tidy_name(get(h, iT)), "away": tidy_name(get(v, iT)),
+             "hs": int(hf), "as": int(vf), "neu": vh1 == "N", "hml": hml, "aml": vml}
+        for ph, k in (("", iC), ("O", iO)):
+            a, b = sbr_num(get(v, k)), sbr_num(get(h, k))
+            sp = tot = None
+            if a is not None and b is not None:
+                by_ml = hml is not None and vml is not None and hml != vml
+                home_fav = (hml < vml) if by_ml else abs(b) <= abs(a)
+                mag, tot = (abs(b), abs(a)) if home_fav else (abs(a), abs(b))
+                if by_ml or tot > mag:
+                    sp = -mag if home_fav else mag
+                else:
+                    tot = None
+            g["sp" + ph], g["tot" + ph] = sp, tot
+        if g["sp"] is not None and g.get("spO") is not None and abs(g["sp"] - g["spO"]) > 14:
+            g["spO"] = None
+        if g["tot"] is not None and g.get("totO") is not None and abs(g["tot"] - g["totO"]) > 20:
+            g["totO"] = None
+        games.append(g)
+    return games
+
+def wayback_raw(orig):
+    q = urllib.parse.quote(orig, safe=":/")
+    try:
+        js = http_json("https://archive.org/wayback/available?url=" + urllib.parse.quote(q, safe=""))
+        snap = (js or {}).get("archived_snapshots", {}).get("closest") or {}
+        if snap.get("available") and snap.get("timestamp"):
+            return f"https://web.archive.org/web/{snap['timestamp']}id_/{q}"
+    except RuntimeError:
+        pass
+    try:
+        rows = http_json(f"https://web.archive.org/cdx/search/cdx?url={urllib.parse.quote(q, safe='')}&output=json&filter=statuscode:200&limit=-1")
+        if rows and len(rows) > 1:
+            return f"https://web.archive.org/web/{rows[-1][1]}id_/{q}"
+    except RuntimeError:
+        pass
+    return None
+
+def http_bytes(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "crab-locks-updater"})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return r.read()
+
+def import_sbr_archive(sports, state, test=False):
+    done = state.setdefault("sbr_archive", {})
+    for sport in ("NCAAF", "NCAAB"):
+        if sport not in sports:
+            continue
+        folder, stem = SBR_DIR[sport]
+        for start in SBR_SEASONS:
+            if str(start) in done.get(sport, {}) and not test:
+                continue
+            label = f"{start}-{str(start + 1)[-2:]}"
+            found = None
+            for ext in ("xlsx", "xls"):
+                orig = f"https://www.sportsbookreviewsonline.com/scoresoddsarchives/{folder}/{stem} {label}.{ext}"
+                raw = wayback_raw(orig) or wayback_raw(orig.replace("https://www.", "https://"))
+                time.sleep(2)
+                if raw:
+                    found = (ext, raw)
+                    break
+            if not found:
+                say(f"  {sport} {label}: no archived copy found")
+                done.setdefault(sport, {})[str(start)] = "missing"
+                continue
+            ext, raw = found
+            if ext != "xlsx":
+                say(f"  {sport} {label}: only an old .xls copy exists; skipping (can't read that format)")
+                done.setdefault(sport, {})[str(start)] = "xls"
+                continue
+            try:
+                blob = http_bytes(raw)
+                games = sbr_games(read_xlsx(blob), sport, start)
+            except Exception as e:
+                say(f"  ! {sport} {label}: couldn't read the archived file ({e})")
+                if test:
+                    return
+                continue
+            time.sleep(2)
+            op = sum(1 for g in games if g.get("spO") is not None)
+            agree = sum(1 for g in games if g.get("sp") and g["hs"] != g["as"] and (g["sp"] < 0) == (g["hs"] > g["as"]))
+            n = sum(1 for g in games if g.get("sp") and g["hs"] != g["as"])
+            say(f"  {sport} {label}: {len(games)} games, {op} with opening spreads; favorites won {agree}/{n}")
+            if test:
+                say(f"  sample: {json.dumps(games[len(games)//2]) if games else 'none'}")
+                return
+            if n and agree / n < 0.55:
+                say(f"  ! {sport} {label}: spreads don't line up with results; not saving this season")
+                done.setdefault(sport, {})[str(start)] = "bad"
+                continue
+            for k, g in enumerate(games):
+                g["id"] = f"sbr-{start}-{k}"
+            save(f"archive/{sport}/{start}.json", {"sport": sport, "season": start, "source": "Sportsbook Review archive via archive.org",
+                                                    "updated": NOW.isoformat(timespec="seconds"), "games": games})
+            done.setdefault(sport, {})[str(start)] = len(games)
+
 # ------------------------------------------------------------------ index
 def write_index(state):
     idx = {"updated": NOW.isoformat(timespec="seconds"), "sports": {}, "notes": state.get("notes", {})}
     for sport in ("NFL", "NCAAF", "NBA", "NCAAB"):
-        ent = {"base": os.path.exists(os.path.join(DATA, "base", f"{sport}.json")), "api": []}
-        d = os.path.join(DATA, "api", sport)
-        if os.path.isdir(d):
-            ent["api"] = sorted(int(f[:-5]) for f in os.listdir(d) if f.endswith(".json"))
+        ent = {"base": os.path.exists(os.path.join(DATA, "base", f"{sport}.json")), "api": [], "archive": []}
+        for kind in ("api", "archive"):
+            d = os.path.join(DATA, kind, sport)
+            if os.path.isdir(d):
+                ent[kind] = sorted(int(f[:-5]) for f in os.listdir(d) if f.endswith(".json"))
         idx["sports"][sport] = ent
     save("index.json", idx, pretty=True)
 
@@ -610,12 +796,22 @@ def main():
     ap.add_argument("--sports", default="NFL,NCAAF,NBA,NCAAB")
     ap.add_argument("--odds-only", action="store_true")
     ap.add_argument("--test", action="store_true")
+    ap.add_argument("--archive", action="store_true", help="one-time import of the Sportsbook Review college archive")
     args = ap.parse_args()
     sports = [s.strip().upper() for s in args.sports.split(",")]
     state = load("state.json", {"done": {}, "notes": {}})
     state.setdefault("done", {}); state.setdefault("notes", {})
     say(f"Crab Locks update {NOW.astimezone(ET):%Y-%m-%d %H:%M} ET. Keys: CFBD {'yes' if CFBD_KEY else 'MISSING'}, Odds API {'yes' if ODDS_KEY else 'MISSING'}")
     failures = 0
+    if args.archive:
+        try:
+            import_sbr_archive(sports, state, test=args.test)
+        finally:
+            if not args.test:
+                save("state.json", state, pretty=True)
+                write_index(state)
+        say("Archive import finished." + (" Nothing was saved (test)." if args.test else ""))
+        return
 
     def guard(label, fn):
         nonlocal failures
