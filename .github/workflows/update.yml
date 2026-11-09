@@ -4,7 +4,7 @@ on:
   schedule:
     # 11:00 UTC = 6 AM Eastern (7 AM in summer): full update
     - cron: "0 11 * * *"
-    # 21:30 UTC = 4:30 PM Eastern: NBA lines snapshot before tonight's games
+    # 21:30 UTC = 4:30 PM Eastern: NBA and college basketball lines before tonight's games
     - cron: "30 21 * * *"
   workflow_dispatch:
     inputs:
@@ -42,7 +42,7 @@ jobs:
             test) python scripts/update.py --test ;;
             archive-test) python scripts/update.py --archive --test --sports NCAAF,NCAAB ;;
             archive) python scripts/update.py --archive --sports NCAAF,NCAAB ;;
-            odds) python scripts/update.py --sports NBA --odds-only ;;
+            odds) python scripts/update.py --sports NBA,NCAAB --odds-only ;;
             *)    python scripts/update.py ;;
           esac
 
