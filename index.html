@@ -632,6 +632,8 @@ async function loadRemote(sport){
         if (!isNum(g.sp) && isNum(sp)) g.sp = sp;
         if (!isNum(g.tot) && isNum(a.tot)) g.tot = a.tot;
         if (!isNum(g.hml) && isNum(a.hml)){ g.hml = swapped ? a.aml : a.hml; g.aml = swapped ? a.hml : a.aml; }
+        if (!isNum(g.hso) && isNum(a.hso)){ g.hso = swapped ? a.aso : a.hso; g.aso = swapped ? a.hso : a.aso; }
+        if (!isNum(g.oo) && isNum(a.oo)){ g.oo = a.oo; g.uo = a.uo; }
       } else if (!have.has(a.season)) games.push(a);
     }
   }
@@ -654,7 +656,8 @@ function sportInfo(sport){
   let s = `Final scores through ${fmtDate(i.lastDone)}. Closing spreads on ${pct(i.close)} of games, opening spreads on ${pct(i.open)}`;
   if (i.openFrom !== null && i.open) s += ` (most games from ${seasonLabel(sport, i.openFrom)} on)`;
   s += `, moneylines on ${pct(i.ml)}.`;
-  if (sport === 'NFL' || sport === 'NBA') s += ' Opening lines: 2011–2021 from the Sportsbook Review archive, none for 2022–2025, and from this season on the first line the daily update caught.';
+  if (sport === 'NFL') s += ' Opening lines: 2011–2021 from the Sportsbook Review archive, none for 2022–2025, and from this season on the first line the daily update caught.';
+  if (sport === 'NBA') s += ' Opening lines: 2011-12 to 2021-22 from the Sportsbook Review archive; 2022-23 to 2025-26 filling in from ESPN a few hundred games a day; this season from ESPN (DraftKings opener and closer).';
   if (remote.index?.updated) s += ` Data updated ${new Date(remote.index.updated).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}.`;
   return s;
 }
