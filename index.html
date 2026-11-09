@@ -91,6 +91,33 @@ button,input,select,textarea{font:inherit;color:inherit}
 .cat li button.on::before{content:"●";font-size:10px;color:var(--crab)}
 .cat li button.na{opacity:.45}
 .side .foot{padding:12px 16px;font-size:12px;color:var(--muted)}
+.fsearch{margin:0 12px 10px;position:relative}
+.fsearch input{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px 8px 32px;background:var(--surface)}
+.fsearch svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;stroke:var(--muted);fill:none;stroke-width:2}
+.cat.pop summary{color:var(--crab)}
+.cat li button .hint{margin-left:auto;font-size:12px;color:var(--muted);font-weight:400}
+.sres{padding:0 0 8px}
+.sres .none{padding:8px 16px;color:var(--muted);font-size:14px}
+/* multi-select */
+.msel{display:grid;gap:8px}
+.mtools{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.mtools input[type=search]{flex:1 1 180px;border:1px solid var(--line);border-radius:6px;padding:7px 9px;background:var(--surface-2)}
+.mtools .sorts{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.mtools .sorts button{border:0;background:var(--surface-2);padding:6px 10px;cursor:pointer;font-size:13px}
+.mtools .sorts button+button{border-left:1px solid var(--line)}
+.mtools .sorts button[aria-pressed="true"]{background:var(--navy);color:#fff}
+.quick{display:flex;gap:6px;flex-wrap:wrap}
+.quick button{border:1px solid var(--line);background:var(--surface-2);border-radius:16px;padding:5px 11px;cursor:pointer;font-size:13px}
+.mlist{max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.mgh{display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--surface-2);border-bottom:1px solid var(--line);padding:6px 10px;font-weight:600;font-size:13px;z-index:1}
+.mrow{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--line);cursor:pointer}
+.mrow:hover{background:var(--surface-2)}
+.mrow input{width:17px;height:17px;accent-color:var(--crab)}
+.mrow .nm{font-weight:500}
+.mrow .sub{grid-column:2;font-size:12px;color:var(--muted)}
+.mrow .st{grid-row:1 / span 2;grid-column:3;text-align:right;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mrow .st small{display:block;color:var(--muted);font-size:11px}
+.mcount{font-size:13px;color:var(--muted)}
 
 /* main */
 .main{padding:16px 18px 30px;display:grid;gap:14px;min-width:0;align-content:start}
@@ -226,7 +253,7 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
   <aside class="side" aria-label="Filters">
     <button class="sidetoggle" id="sideToggle" aria-expanded="false">Add a filter</button>
     <h2 class="sidehead">Add a filter</h2>
-    <div id="cats"></div>
+    <div id="cats"><div class="fsearch"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="fq" placeholder="Search filters" aria-label="Search filters"></div><div id="catList"></div></div>
     <div class="foot" id="dataStatus"></div>
   </aside>
 
@@ -609,6 +636,26 @@ const yn = [['any','Any'],['yes','Yes'],['no','No']];
 const streakOpts = [['any','Any'],['w2','Won 2+ in a row'],['w3','Won 3+ in a row'],['w5','Won 5+ in a row'],['l2','Lost 2+ in a row'],['l3','Lost 3+ in a row'],['l5','Lost 5+ in a row']];
 const atsOpts = streakOpts.map(([k,l]) => [k, l.replace('Won','Covered').replace('Lost','Failed to cover')]);
 const streakTest = (v, s) => { if (!isNum(s)) return false; const n = +v.slice(1); return v[0] === 'w' ? s >= n : s <= -n; };
+function seasonName(sport, s){ return isHoops(sport) ? `${s}-${String(s+1).slice(-2)} season` : `${s} season`; }
+function seasonOptions(rows){
+  const m = new Map();
+  rows.forEach(r => { const o = m.get(r.g.season) || { lo: r.g.date, hi: r.g.date }; if (r.g.date < o.lo) o.lo = r.g.date; if (r.g.date > o.hi) o.hi = r.g.date; m.set(r.g.season, o); });
+  return [...m.entries()].sort((a,b) => b[0] - a[0]).map(([s, o]) => ({ v: String(s), label: seasonName(state.sport, s), sub: `${fmtDate(o.lo)} – ${fmtDate(o.hi)}` }));
+}
+function teamOptions(rows){
+  const last = new Map();
+  rows.forEach(r => { const o = last.get(r.team); if (!o || r.g.season >= o.season) last.set(r.team, { season: r.g.season, conf: r.tc || null }); });
+  const latest = Math.max(...[...last.values()].map(o => o.season));
+  return [...last.entries()].map(([team, o]) => ({ v: team, label: team, group: o.conf ? (o.season < latest ? 'No longer active or moved' : o.conf) : null, sub: o.season < latest ? `last played ${seasonName(state.sport, o.season).replace(' season','')}` : '' }))
+    .sort((a,b) => (a.group || '').localeCompare(b.group || '') || a.label.localeCompare(b.label));
+}
+function confOptions(rows, key){
+  const m = new Map();
+  rows.forEach(r => { const c = r[key]; if (!c) return; const o = m.get(c) || { lo: r.g.season, hi: r.g.season }; o.lo = Math.min(o.lo, r.g.season); o.hi = Math.max(o.hi, r.g.season); m.set(c, o); });
+  return [...m.entries()].map(([c, o]) => ({ v: c, label: c, sub: o.lo === o.hi ? seasonName(state.sport, o.lo).replace(' season','') : `${seasonName(state.sport, o.lo).replace(' season','')} to ${seasonName(state.sport, o.hi).replace(' season','')}` }))
+    .sort((a,b) => a.label.localeCompare(b.label));
+}
+const POPULAR = ['season','venue','role','sp','team','tconf','prevW','mvdir','rest'];
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const CATS = [
@@ -631,7 +678,7 @@ const CATS = [
     { id:'money', label:'Team’s % of money', type:'range', get:r=>r.money, step:1, need:r=>isNum(r.money), about:'Share of dollars on this team. Only available with imported betting-percentage data.' },
   ]},
   { id:'time', name:'Time period', icon:'time', filters:[
-    { id:'season', label:'Seasons', type:'range', get:r=>r.g.season, step:1, about:'Season range. Basketball seasons go by the year they start, so 2025 means 2025-26.' },
+    { id:'season', label:'Seasons', type:'multi', val:r=>r.g.season, options: seasonOptions, quick:true, noun:'seasons', about:'Pick the seasons to include. Use the quick picks for recent stretches; a system that only works in old seasons may not work now.' },
     { id:'week', label:'Week', type:'range', get:r=>r.g.week, step:1, need:r=>isNum(r.g.week), about:'Week of the football season.' },
     { id:'stype', label:'Regular season or playoffs', type:'choice', opts:[['any','Any'],['reg','Regular season'],['post','Postseason']], test:(r,v)=> v==='reg' ? !r.g.post : !!r.g.post, about:'Regular season or postseason (playoffs, bowls, tournaments).' },
     { id:'month', label:'Month', type:'choice', opts:[['any','Any'], ...MONTHS.map((m,i)=>[String(i+1), m])], test:(r,v)=> r.month === +v, about:'Calendar month the game was played.' },
@@ -641,10 +688,10 @@ const CATS = [
     { id:'venue', label:'Home or away', type:'choice', opts:[['any','Any'],['home','Home'],['away','Away']], test:(r,v)=> (v==='home') === r.H, about:'Whether the team is the listed home team.' },
     { id:'neu', label:'Neutral site', type:'choice', opts:[['any','Any'],['no','Exclude neutral'],['yes','Neutral only']], test:(r,v)=> (v==='yes') === !!r.g.neu, about:'Games at a neutral site, such as bowls, tournaments and international games.' },
     { id:'conf', label:'Division / conference game', type:'choice', opts:yn, test:(r,v)=> r.conf === null ? false : (v==='yes') === r.conf, need:r=>r.conf!==null, about:'NFL: division games. College: conference games.' },
-    { id:'team', label:'Team', type:'text', ph:'e.g. Chiefs, KC, Alabama', test:(r,v)=> r.team.toLowerCase().includes(v.toLowerCase()), about:'Only this team (matches any part of the name).' },
-    { id:'opp', label:'Opponent', type:'text', ph:'e.g. Bills', test:(r,v)=> r.opp.toLowerCase().includes(v.toLowerCase()), about:'Only games against this opponent.' },
-    { id:'tconf', label:'Team conference', type:'text', ph:'e.g. SEC', test:(r,v)=> !!r.tc && r.tc.toLowerCase().includes(v.toLowerCase()), need:r=>!!r.tc, about:'College only. Matches any part of the conference name.' },
-    { id:'oconf', label:'Opponent conference', type:'text', ph:'e.g. Sun Belt', test:(r,v)=> !!r.oc && r.oc.toLowerCase().includes(v.toLowerCase()), need:r=>!!r.oc, about:'College only. Matches any part of the conference name.' },
+    { id:'team', label:'Team', type:'multi', val:r=>r.team, options: rows => teamOptions(rows), noun:'teams', about:'Only bet on these teams. Each team shows how this system has done with it, so you can see who carries it.' },
+    { id:'opp', label:'Opponent', type:'multi', val:r=>r.opp, options: rows => teamOptions(rows), noun:'teams', about:'Only games against these opponents.' },
+    { id:'tconf', label:'Team conference', type:'multi', val:r=>r.tc, options: rows => confOptions(rows, 'tc'), need:r=>!!r.tc, noun:'conferences', about:'College only. Only teams in these conferences at the time of the game.' },
+    { id:'oconf', label:'Opponent conference', type:'multi', val:r=>r.oc, options: rows => confOptions(rows, 'oc'), need:r=>!!r.oc, noun:'conferences', about:'College only. Only opponents from these conferences at the time of the game.' },
   ]},
   { id:'prev', name:'Previous game', icon:'prev', filters:[
     { id:'prevW', label:'Team’s last game', type:'choice', opts:[['any','Any'],['w','Won'],['l','Lost']], test:(r,v)=> r.prevW === (v==='w' ? 1 : 0), about:'Straight-up result of the team’s previous game this season.' },
@@ -684,7 +731,7 @@ const FBYID = Object.fromEntries(ALLF.map(f => [f.id, f]));
 
 /* ---------- state ---------- */
 const state = { sport:'NFL', bet:'spread', juice:-110, f:{}, name:'Untitled system', theory:'', fade:false, hideDup:false, tab:'graph', id:null };
-const isActive = (d, v) => v !== undefined && v !== null && (d.type==='range' ? (v[0] !== '' || v[1] !== '') : d.type==='text' ? String(v).trim() !== '' : v !== 'any');
+const isActive = (d, v) => v !== undefined && v !== null && (d.type==='multi' ? Array.isArray(v) && v.length > 0 : d.type==='range' ? Array.isArray(v) && (v[0] !== '' || v[1] !== '') : d.type==='text' ? String(v).trim() !== '' : v !== 'any');
 function activeIds(f){ return ALLF.filter(d => isActive(d, f[d.id])).map(d => d.id); }
 
 function makeTester(f, skip){
@@ -695,6 +742,7 @@ function makeTester(f, skip){
       return r => { const x = d.get(r); return isNum(x) && x >= lo && x <= hi; };
     }
     if (d.type === 'text'){ const t = String(v).trim(); return r => d.test(r, t); }
+    if (d.type === 'multi'){ const set = new Set(v.map(String)); return r => { const x = d.val(r); return x !== null && x !== undefined && set.has(String(x)); }; }
     return r => d.test(r, v);
   });
   return r => { for (const t of tests) if (!t(r)) return false; return true; };
@@ -770,7 +818,17 @@ function grade(res){
 /* ---------- formatting helpers ---------- */
 const money = u => { const v = Math.round(u * 100); return (v < 0 ? '−$' : v > 0 ? '+$' : '$') + Math.abs(v).toLocaleString(); };
 const pct = (a, b) => b ? (a / b * 100).toFixed(1) + '%' : '–';
-function filterDetail(d, v){
+function compressSeasons(list, sport){
+  const s = list.map(Number).sort((a,b)=>a-b); const out = []; let a = s[0], p = s[0];
+  const nm = x => isHoops(sport) ? `${x}-${String(x+1).slice(-2)}` : String(x);
+  for (let i = 1; i <= s.length; i++){ if (s[i] === p + 1){ p = s[i]; continue; } out.push(a === p ? nm(a) : `${nm(a)} to ${nm(p)}`); a = p = s[i]; }
+  return out.join(', ');
+}
+function filterDetail(d, v, sport){
+  if (d.type === 'multi'){
+    if (d.id === 'season') return compressSeasons(v, sport || state.sport);
+    return v.length <= 4 ? v.join(', ') : `${v.slice(0,3).join(', ')} and ${v.length - 3} more`;
+  }
   if (d.type === 'range'){
     const a = v[0], b = v[1];
     return a !== '' && b !== '' ? `between ${a} and ${b}` : a !== '' ? `${a} or more` : `${b} or less`;
@@ -780,26 +838,37 @@ function filterDetail(d, v){
 }
 function describe(sys){
   const parts = [SPORT_NAMES[sys.sport] || sys.sport, ({spread:'Spread',ml:'Moneyline',over:'Over',under:'Under'})[sys.bet] + (sys.fade ? ' (faded)' : '')];
-  activeIds(sys.f).forEach(id => { const d = FBYID[id]; parts.push(`${d.label}: ${filterDetail(d, sys.f[id])}`); });
+  activeIds(sys.f).forEach(id => { const d = FBYID[id]; parts.push(`${d.label}: ${filterDetail(d, sys.f[id], sys.sport)}`); });
   return parts.join('; ');
 }
 
 /* ---------- render: sidebar ---------- */
+function filterButton(d, sample){
+  const act = isActive(d, state.f[d.id]); const na = d.need && sample.length && !sample.some(d.need);
+  return `<li><button data-f="${d.id}" class="${act ? 'on' : ''}${na ? ' na' : ''}" title="${na ? 'No data for this sport yet' : ''}">${d.label}${act ? `<span class="hint">${esc(shortDetail(d))}</span>` : ''}</button></li>`;
+}
+function shortDetail(d){ const s = filterDetail(d, state.f[d.id]); return s.length > 18 ? s.slice(0, 17) + '…' : s; }
 function renderCats(){
-  const host = $('#cats');
+  const host = $('#catList');
   const openIds = new Set([...host.querySelectorAll('details[open]')].map(x => x.dataset.cat));
-  const first = !host.children.length;
+  const first = !host.querySelector('details');
   const rows = data.rows[state.sport] || [];
   const sample = rows.length ? rows.filter((_,i) => i % Math.max(1, Math.floor(rows.length/600)) === 0) : [];
-  host.innerHTML = CATS.map(c => {
+  const q = ($('#fq').value || '').trim().toLowerCase();
+  if (q){
+    const hits = ALLF.filter(d => (d.label + ' ' + d.cat.name + ' ' + (d.about || '')).toLowerCase().includes(q));
+    host.innerHTML = `<div class="sres"><ul style="list-style:none;margin:0;padding:0" class="cat">${hits.map(d => filterButton(d, sample)).join('') || '<li class="none">No filters match.</li>'}</ul></div>`;
+    host.querySelectorAll('li button').forEach(b => b.style.paddingLeft = '28px');
+    return;
+  }
+  const pop = { id:'pop', name:'Popular', icon:'streak', filters: POPULAR.map(id => FBYID[id]) };
+  host.innerHTML = [pop, ...CATS].map(c => {
     const on = c.filters.filter(d => isActive(d, state.f[d.id])).length;
-    const open = first ? ['line','move'].includes(c.id) && window.innerWidth > 900 : openIds.has(c.id);
-    return `<details class="cat" data-cat="${c.id}"${open ? ' open' : ''}><summary>${ICONS[c.icon]}<span>${c.name}</span>${on ? `<span class="cnt">${on}</span>` : ''}</summary><ul>${
-      c.filters.map(d => { const act = isActive(d, state.f[d.id]); const na = d.need && sample.length && !sample.some(d.need);
-        return `<li><button data-f="${d.id}" class="${act ? 'on' : ''}${na ? ' na' : ''}" title="${na ? 'No data for this sport yet' : ''}">${d.label}</button></li>`; }).join('')
-    }</ul></details>`;
+    const open = first ? c.id === 'pop' : openIds.has(c.id);
+    return `<details class="cat${c.id === 'pop' ? ' pop' : ''}" data-cat="${c.id}"${open ? ' open' : ''}><summary>${ICONS[c.icon]}<span>${c.name}</span>${on && c.id !== 'pop' ? `<span class="cnt">${on}</span>` : ''}</summary><ul>${c.filters.map(d => filterButton(d, sample)).join('')}</ul></details>`;
   }).join('');
 }
+$('#fq').addEventListener('input', () => renderCats());
 $('#cats').addEventListener('click', e => { const b = e.target.closest('button[data-f]'); if (b) openFilter(b.dataset.f); });
 $('#sideToggle').addEventListener('click', () => { const s = $('.side'); const o = !s.classList.contains('open'); s.classList.toggle('open', o); $('#sideToggle').setAttribute('aria-expanded', String(o)); });
 
@@ -923,7 +992,7 @@ function openFilter(id){
   const d = FBYID[id];
   const rows = data.rows[state.sport] || [];
   const cur = state.f[id];
-  edit = { d, v: d.type === 'range' ? (cur ? cur.slice() : ['','']) : d.type === 'text' ? (cur || '') : (cur || 'any') };
+  edit = { d, v: d.type === 'range' ? (cur ? cur.slice() : ['','']) : d.type === 'multi' ? (Array.isArray(cur) ? cur.map(String) : []) : d.type === 'text' ? (cur || '') : (cur || 'any') };
   $('#fTitle').textContent = d.label;
   $('#fAbout').textContent = d.about || '';
   $('#fRemove').hidden = !isActive(d, cur);
@@ -948,6 +1017,20 @@ function openFilter(id){
     fMin.addEventListener('input', () => { edit.v[0] = fMin.value.trim(); syncSl(); liveUpdate(); });
     fMax.addEventListener('input', () => { edit.v[1] = fMax.value.trim(); syncSl(); liveUpdate(); });
     syncSl();
+  } else if (d.type === 'multi'){
+    edit.opts = d.options(rows); edit.sort = 'az';
+    box.innerHTML = `<div class="msel">
+      ${d.quick ? `<div class="quick"><button data-q="3">Last 3 seasons</button><button data-q="5">Last 5</button><button data-q="10">Last 10</button><button data-q="all">All seasons</button></div>` : ''}
+      <div class="mtools"><input type="search" id="mq" placeholder="Search ${d.noun}" aria-label="Search ${d.noun}"><span class="sorts" role="group" aria-label="Sort"><button data-s="az" aria-pressed="true">${d.id === 'season' ? 'Newest' : 'A–Z'}</button><button data-s="best" aria-pressed="false">Best</button><button data-s="worst" aria-pressed="false">Worst</button></span></div>
+      <div class="mtools"><span class="mcount" id="mcount"></span><button class="lbtn" id="mAll">Select all shown</button><button class="lbtn" id="mNone">Clear</button></div>
+      <div class="mlist" id="mlist"></div></div>`;
+    const sel = () => new Set(edit.v.map(String));
+    box.querySelector('#mq').addEventListener('input', renderMulti);
+    box.querySelector('.sorts').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; edit.sort = b.dataset.s; box.querySelectorAll('.sorts button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderMulti(); });
+    box.querySelector('#mAll').addEventListener('click', () => { const s = sel(); visibleOpts().forEach(o => s.add(o.v)); edit.v = [...s]; renderMulti(); liveUpdate(); });
+    box.querySelector('#mNone').addEventListener('click', () => { edit.v = []; renderMulti(); liveUpdate(); });
+    box.querySelectorAll('.quick button').forEach(b => b.addEventListener('click', () => { const all = edit.opts.map(o => o.v); edit.v = b.dataset.q === 'all' ? [] : all.slice(0, +b.dataset.q); renderMulti(); liveUpdate(); }));
+    box.querySelector('#mlist').addEventListener('change', e => { const cb = e.target.closest('input[type=checkbox]'); if (!cb) return; const s = sel(); if (cb.dataset.g !== undefined){ visibleOpts().filter(o => (o.group || '') === cb.dataset.g).forEach(o => cb.checked ? s.add(o.v) : s.delete(o.v)); } else { cb.checked ? s.add(cb.value) : s.delete(cb.value); } edit.v = [...s]; renderMulti(); liveUpdate(); });
   } else if (d.type === 'text'){
     box.innerHTML = `<div class="field"><label for="fText">${esc(d.label)}</label><input type="text" id="fText" placeholder="${esc(d.ph || '')}" value="${esc(edit.v)}"></div>`;
     $('#fText').addEventListener('input', e => { edit.v = e.target.value; liveUpdate(); });
@@ -956,8 +1039,33 @@ function openFilter(id){
     box.querySelector('.choices').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; edit.v = b.dataset.v; box.querySelectorAll('.choices button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); liveUpdate(); });
   }
   edit.base = evaluate({ skip: id });
+  if (d.type === 'multi'){
+    edit.stats = new Map();
+    for (const b of edit.base.bets){ const k = String(d.val(b.r)); const o = edit.stats.get(k) || { W:0, L:0, P:0, U:0 }; o[b.res]++; o.U += b.u; edit.stats.set(k, o); }
+    renderMulti();
+  }
   liveUpdate();
   $('#dlgFilter').showModal();
+}
+function visibleOpts(){
+  const q = ($('#mq')?.value || '').trim().toLowerCase();
+  let list = edit.opts.filter(o => !q || o.label.toLowerCase().includes(q) || (o.group || '').toLowerCase().includes(q));
+  const st = o => edit.stats.get(o.v) || { W:0, L:0, P:0, U:0 };
+  if (edit.sort === 'best') list = list.slice().sort((a,b) => st(b).U - st(a).U);
+  if (edit.sort === 'worst') list = list.slice().sort((a,b) => st(a).U - st(b).U);
+  return list;
+}
+function renderMulti(){
+  const host = $('#mlist'); if (!host) return;
+  const s = new Set(edit.v.map(String)), list = visibleOpts();
+  const grouped = edit.sort === 'az' && list.some(o => o.group);
+  const row = o => { const t = edit.stats.get(o.v); return `<label class="mrow"><input type="checkbox" value="${esc(o.v)}"${s.has(o.v) ? ' checked' : ''}><span class="nm">${esc(o.label)}</span>${o.sub ? `<span class="sub">${esc(o.sub)}</span>` : ''}<span class="st">${t ? `<span class="${t.U >= 0 ? 'W' : 'L'}">${money(t.U)}</span><small>${t.W}-${t.L}${t.P ? '-' + t.P : ''}</small>` : '<small>no games</small>'}</span></label>`; };
+  if (grouped){
+    const groups = new Map(); list.forEach(o => { const g = o.group || 'Other'; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(o); });
+    const order = [...groups.keys()].sort((a,b) => (a.startsWith('No longer') ? 1 : 0) - (b.startsWith('No longer') ? 1 : 0) || a.localeCompare(b));
+    host.innerHTML = order.map(g => { const items = groups.get(g); const all = items.every(o => s.has(o.v)); return `<div class="mgh"><span>${esc(g)}</span><label style="font-weight:500;display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" data-g="${esc(g === 'Other' ? '' : g)}"${all ? ' checked' : ''}> Select all</label></div>${items.map(row).join('')}`; }).join('');
+  } else host.innerHTML = list.map(row).join('') || '<div class="empty">Nothing matches.</div>';
+  $('#mcount').textContent = s.size ? `${s.size} selected` : `None selected = all ${edit.d.noun}`;
 }
 let liveT = 0;
 function liveUpdate(){
@@ -986,7 +1094,7 @@ function renderFilterChart(){
     const groups = d.opts.filter(o => o[0] !== 'any').map(o => ({ v:o[0], label:o[1], U:0, n:0, W:0, L:0 }));
     for (const b of bets) for (const g of groups) if (d.test(b.r, g.v)){ g.U += b.u; g.n++; if (b.res==='W') g.W++; if (b.res==='L') g.L++; }
     drawBins(el, groups.map(g => ({ label: g.label, title: `${g.label}: ${g.W}-${g.L}, ${money(g.U)}`, U: g.U, n: g.n, sel: edit.v === g.v || edit.v === 'any' })), 'Money won for each option, with your other filters applied.');
-  } else el.innerHTML = '';
+  } else el.innerHTML = d.type === 'multi' ? '<div class="note">Each option shows money won and record for this system with your other filters applied. Sort by Best or Worst to see what drives it.</div>' : '';
 }
 const fmtNum = v => Math.abs(v) >= 100 ? Math.round(v) : (+v.toFixed(1)).toString();
 function drawBins(el, bins, caption){
@@ -1149,11 +1257,25 @@ async function loadSystems(){ try{ const d = await store.get('systems'); systems
 async function persistSystems(){ await store.set('systems', { list: systems }); }
 function snapshot(){ return { id: state.id || 's' + Date.now().toString(36), name: state.name.trim() || 'Untitled system', sport: state.sport, bet: state.bet, juice: +state.juice || -110, f: JSON.parse(JSON.stringify(state.f)), theory: state.theory, fade: state.fade, hideDup: state.hideDup, saved: Date.now() }; }
 async function loadSystem(s){
+  if (s.sport !== state.sport){ state.f = {}; await setSport(s.sport); }
   Object.assign(state, { id: s.id, name: s.name, bet: s.bet, juice: s.juice ?? -110, f: JSON.parse(JSON.stringify(s.f || {})), theory: s.theory || '', fade: !!s.fade, hideDup: !!s.hideDup });
-  // older saved systems stored every filter; keep only active ones
-  Object.keys(state.f).forEach(k => { if (!FBYID[k] || !isActive(FBYID[k], state.f[k])) delete state.f[k]; });
+  migrate(state.f);
   syncInputs();
-  if (s.sport !== state.sport) await setSport(s.sport); else recompute();
+  recompute();
+}
+function migrate(f){
+  const rows = data.rows[state.sport] || [];
+  const s = f.season;
+  if (Array.isArray(s) && s.length === 2 && (s[0] === '' || s[1] === '' || !isNaN(+s[0])) && typeof s[0] === 'string' && !s.some(x => x && x.length !== 4)){
+    const lo = s[0] === '' ? -Infinity : +s[0], hi = s[1] === '' ? Infinity : +s[1];
+    const all = [...new Set(rows.map(r => r.g.season))];
+    f.season = (lo === -Infinity && hi === Infinity) ? [] : all.filter(x => x >= lo && x <= hi).map(String);
+  }
+  const names = key => [...new Set(rows.map(r => r[key]).filter(Boolean))];
+  for (const [id, key] of [['team','team'],['opp','opp'],['tconf','tc'],['oconf','oc']]){
+    if (typeof f[id] === 'string'){ const q = f[id].trim().toLowerCase(); f[id] = q ? names(key).filter(n => n.toLowerCase().includes(q)) : []; }
+  }
+  Object.keys(f).forEach(k => { if (!FBYID[k] || !isActive(FBYID[k], f[k])) delete f[k]; });
 }
 function syncInputs(){
   $('#sysName').value = state.name; $('#theory').value = state.theory; $('#fade').checked = state.fade; $('#hideDup').checked = state.hideDup; $('#juice').value = state.juice;
