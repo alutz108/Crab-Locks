@@ -50,6 +50,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 .top-in{padding:9px 16px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
 .brand{font-family:var(--fd);font-weight:700;font-size:26px;letter-spacing:.4px;margin-right:auto;display:flex;align-items:baseline;gap:10px;white-space:nowrap}
 .brand small{font-family:var(--fb);font-weight:400;font-size:12px;color:var(--navy-sub)}
+@media (max-width:1500px){.brand small{display:none}}
+@media (min-width:641px){.top-in{gap:8px 10px}}
 .top select,.tbtn{background:var(--navy-2);border:1px solid var(--navy-line);color:var(--navy-ink);border-radius:6px;padding:7px 10px;cursor:pointer}
 .tbtn:hover{border-color:var(--accent-fill)}
 .tbtn.primary{background:var(--accent-fill);color:var(--accent-ink);border-color:var(--accent-fill);font-weight:600}
@@ -221,9 +223,117 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
 .sysitem .n{font-weight:600}
 .sysitem .d{grid-column:1;font-size:13px;color:var(--muted)}
 .sysitem .a{grid-row:1 / span 2;grid-column:2;display:flex;gap:6px;align-items:center}
+.ptabs{display:flex;gap:6px;flex-wrap:wrap}
+.ptabs button{border:1px solid var(--line);background:var(--surface-2);border-radius:18px;padding:6px 13px;cursor:pointer;font-weight:600}
+.ptabs button[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+.pick-card{border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:10px}
+.pick-card h3{margin:0;font-family:var(--fd);font-size:21px}
+.pick-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.tier{font-size:12px;font-weight:700;border-radius:4px;padding:2px 8px;white-space:nowrap}
+.tier.held{background:var(--win-bg);color:var(--win)}
+.tier.watch{background:#FFF1D6;color:#8A5A00}
+:root[data-theme="dark"] .tier.watch{background:#3A2E12;color:#FFB000}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tier.watch{background:#3A2E12;color:#FFB000}}
+.pick-card p{margin:0;font-size:14px}
+.pick-rule{font-size:13px;color:var(--muted)}
+.pstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.pstats{grid-template-columns:minmax(0,1fr)}}
+.pstat{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.pstat .k{font-size:12px;color:var(--muted);font-weight:600}
+.pstat .v{font-family:var(--fd);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.pstat .s{font-size:12px;color:var(--muted)}
+.pick-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.tbtn.pickbtn{border-color:var(--crab)}
+.m-show{display:none}
+.tbtn.today{border-color:var(--accent-fill)}
+.risk{display:flex;flex-wrap:wrap;gap:6px;align-items:stretch}
+.risk .kpi .v{background:var(--surface-2);color:var(--ink);border:1px solid var(--line);font-size:17px}
+.risk .kpi .v.bad{color:var(--loss)}
+.risk .kpi .v.good{color:var(--win)}
+.risk-label{font-size:12px;font-weight:700;color:var(--muted);align-self:center;margin-right:2px;text-transform:uppercase;letter-spacing:.5px}
+@media (max-width:640px){.risk{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.risk-label{grid-column:1 / -1}.risk .kpi{flex-direction:column;align-items:flex-start;gap:3px;padding:7px 8px}}
+.logbtn{border:1px solid var(--win);color:var(--win);background:transparent;border-radius:6px;padding:5px 10px;font-weight:600;cursor:pointer;white-space:nowrap}
+.logbtn.done{border-color:var(--line);color:var(--muted)}
+.match .right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.board-item{border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px}
+.board-item.conflict{border-color:var(--loss);background:var(--loss-bg)}
+.board-item .pick{font-family:var(--fd);font-size:21px;font-weight:700}
+.board-item .meta{font-size:13px;color:var(--muted)}
+.board-item .sys{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:12px;border:1px solid var(--line);border-radius:12px;padding:2px 9px;background:var(--surface-2)}
+.chip .gr{font-weight:700;margin-left:4px}
+.chip.pick-chip{border-color:var(--crab)}
+.board-item .right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.board-item .odds{font-family:var(--fd);font-size:20px;font-weight:600;color:var(--accent)}
+.warn{grid-column:1 / -1;font-size:13px;color:var(--loss);font-weight:600}
+.dayhead{font-family:var(--fd);font-size:19px;font-weight:700;margin:6px 0 -2px}
+.betrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.betrow .pick{font-weight:600}
+.betrow .meta{font-size:13px;color:var(--muted)}
+.betrow .res{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.betrow .del{grid-column:2;justify-self:end}
+.badge-p{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:1px 8px}
+.logform{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:640px){.logform{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){.m-show{display:inline}}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:8px;border:1px solid var(--crab);z-index:20;opacity:0;pointer-events:none;transition:opacity .2s}
 .toast.show{opacity:1}
 @media (prefers-reduced-motion: reduce){.toast{transition:none}}
+/* keep every column from growing past the screen */
+.app > *, .main > *, .card, .build > *{min-width:0}
+
+/* ---------- phones ---------- */
+@media (max-width:640px){
+  body{font-size:15px}
+  input:not(.sysname), select, textarea{font-size:16px !important} /* stops iPhone zooming in on tap */
+  .sysname{font-size:23px !important}
+  .top{position:static}
+  .top-in{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:7px;padding:10px 12px}
+  .brand{grid-column:1 / span 10;font-size:23px;margin:0;align-self:center}
+  #openBoard{grid-column:11 / span 5;grid-row:1}
+  .brand small{display:none}
+  #openPicks{grid-column:16 / span 5;grid-row:1}
+  #openBets,#newSystem,#openSystems,#saveSystem,#openBoard,#openPicks{white-space:nowrap}
+  .m-hide{display:none}
+  #sport{grid-column:1 / span 20;padding:9px 10px}
+  #betType{grid-column:1 / span 20;display:grid;grid-template-columns:repeat(4,1fr)}
+  #openBets,#newSystem,#openSystems,#saveSystem{grid-column:span 5}
+  #betType button{padding:9px 4px}
+  #openBets,#newSystem,#openSystems,#saveSystem,#openBoard,#openPicks{padding:8px 4px;font-size:14px;text-align:center}
+  .main{padding:12px 12px 28px;gap:12px}
+  .sysname{font-size:23px;flex-basis:100%}
+  .opts{gap:10px 14px}
+  .opts input[type=number]{width:80px}
+  .kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .kpi{flex-direction:column;align-items:flex-start;gap:3px;padding:7px 8px}
+  .kpi:first-child{grid-column:span 2}
+  .kpi .v{font-size:18px;padding:2px 7px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .build{display:flex;flex-direction:column}
+  .ftable{order:-1}
+  .theory{border-bottom:0;border-top:1px solid var(--line)}
+  .theory textarea{min-height:70px}
+  .ftable td{padding:8px 6px}
+  .tabs{padding:0 4px}
+  .tabs button{padding:11px 9px 9px;font-size:14px}
+  .tabbody{padding:12px}
+  .cat summary{padding:13px 14px}
+  .cat li button{padding:11px 14px 11px 40px;font-size:15px}
+  .fsearch{margin:10px 10px 6px}
+  /* pop-ups become full-screen sheets */
+  dialog{width:100vw;max-width:100vw;height:100%;max-height:100%;margin:0;border:0;border-radius:0}
+  .dlg-h{padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;flex-wrap:wrap}
+  .dlg-h h2{font-size:22px}
+  .dlg-b{padding:14px}
+  .dlg-f{padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px))}
+  .dlg-f .btn{flex:1}
+  #dlgFilter .dlg-h{display:grid;grid-template-columns:minmax(0,1fr)}
+  .live{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+  .live .kpi{flex-direction:column;align-items:flex-start;padding:5px 6px}
+  .live .kpi .v{font-size:15px}
+  .mlist{max-height:none}
+  .match .pick{font-size:18px}
+  .match{grid-template-columns:62px 1fr auto;gap:2px 10px}
+}
 </style>
 </head>
 <body>
@@ -242,10 +352,12 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
       <button data-v="over" aria-pressed="false">Over</button>
       <button data-v="under" aria-pressed="false">Under</button>
     </div>
+    <button class="tbtn today" id="openBoard">Today</button>
+    <button class="tbtn pickbtn" id="openPicks">🦀 <span class="m-hide">Crab </span>Picks</button>
+    <button class="tbtn" id="openBets">Bets</button>
     <button class="tbtn" id="newSystem">New</button>
-    <button class="tbtn" id="openSystems">My systems</button>
-    <button class="tbtn" id="openImport">Import</button>
-    <button class="tbtn primary" id="saveSystem">Save system</button>
+    <button class="tbtn" id="openSystems">Systems</button>
+    <button class="tbtn primary" id="saveSystem">Save<span class="m-hide"> system</span></button>
   </div>
 </header>
 
@@ -254,7 +366,7 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
     <button class="sidetoggle" id="sideToggle" aria-expanded="false">Add a filter</button>
     <h2 class="sidehead">Add a filter</h2>
     <div id="cats"><div class="fsearch"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="fq" placeholder="Search filters" aria-label="Search filters"></div><div id="catList"></div></div>
-    <div class="foot" id="dataStatus"></div>
+    <div class="foot"><div id="dataStatus"></div><button class="lbtn" id="openImport" style="padding:6px 0">Import data from a file</button></div>
   </aside>
 
   <main class="main">
@@ -277,6 +389,7 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
       <div class="kpi"><span class="k">ROI</span><span class="v" id="kRoi">–</span></div>
       <div class="kpi" title="A: strong and big enough to trust. B: promising. C: slight edge. D: about break-even. F: losing."><span class="k">Grade</span><span class="v grade g-x" id="kGrade">–</span></div>
     </div>
+    <div class="risk" id="riskRow"></div>
     <div class="verdict" id="vText"></div>
 
     <section class="card build">
@@ -331,12 +444,49 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
   </div>
 </dialog>
 
+<dialog id="dlgPicks" aria-labelledby="picksTitle" style="width:min(900px,calc(100vw - 20px))">
+  <div class="dlg-h"><h2 id="picksTitle">🦀 Crab Picks</h2><button class="lbtn" data-close>Close</button></div>
+  <div class="dlg-b">
+    <p class="muted" style="margin:0;font-size:14px">Pre-built systems that made money. Each was found using older seasons only, then checked on later seasons it had never seen. That tested-on result is the one to trust. Everything updates with each daily data refresh.</p>
+    <div class="ptabs" id="pickTabs"></div>
+    <div id="pickList" style="display:grid;gap:12px"></div>
+  </div>
+</dialog>
+
 <dialog id="dlgSystems" aria-labelledby="sysTitle">
   <div class="dlg-h"><h2 id="sysTitle">My systems</h2><button class="lbtn" data-close>Close</button></div>
   <div class="dlg-b"><div class="syslist" id="sysList"></div>
-    <div class="note">Systems are saved in this browser. To move them to another device, copy them here and paste them there.</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="sysCopy">Copy all systems</button><button class="btn" id="sysPaste">Paste systems</button></div>
+    <div class="note">Systems and logged bets are saved in this browser. To move them to another device, copy them here and paste them there.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="sysCopy">Copy systems and bets</button><button class="btn" id="sysPaste">Paste systems</button></div>
   </div>
+</dialog>
+
+<dialog id="dlgBoard" aria-labelledby="boardTitle" style="width:min(820px,calc(100vw - 20px))">
+  <div class="dlg-h"><h2 id="boardTitle">Today’s board</h2><button class="lbtn" data-close>Close</button></div>
+  <div class="dlg-b">
+    <div class="ptabs" id="boardRange"><button data-d="0" aria-pressed="true">Today</button><button data-d="2" aria-pressed="false">Next 3 days</button><button data-d="6" aria-pressed="false">Next 7 days</button></div>
+    <label class="muted" style="font-size:14px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="boardPicks" checked> Include Crab Picks</label>
+    <div id="boardList" style="display:grid;gap:10px"></div>
+  </div>
+</dialog>
+
+<dialog id="dlgLog" aria-labelledby="logTitle" style="width:min(520px,calc(100vw - 20px))">
+  <div class="dlg-h"><h2 id="logTitle">Log a bet</h2><button class="lbtn" data-close>Close</button></div>
+  <div class="dlg-b">
+    <div><div class="pick" id="logPick" style="font-family:var(--fd);font-size:22px;font-weight:700"></div><div class="muted" id="logGame"></div></div>
+    <div class="logform">
+      <div class="field" id="logLineWrap"><label for="logLine">Line you got</label><input type="number" id="logLine" step="0.5"></div>
+      <div class="field"><label for="logOdds">Price</label><input type="number" id="logOdds" step="5"></div>
+      <div class="field"><label for="logStake">Amount risked ($)</label><input type="number" id="logStake" step="5" min="1" value="100"></div>
+    </div>
+    <div class="note" style="margin:0">Enter the line and price your sportsbook gave you. Crab Locks grades the bet automatically once the final score is in.</div>
+  </div>
+  <div class="dlg-f"><button class="btn" data-close>Cancel</button><button class="btn primary" id="logGo">Log bet</button></div>
+</dialog>
+
+<dialog id="dlgBets" aria-labelledby="betsTitle" style="width:min(820px,calc(100vw - 20px))">
+  <div class="dlg-h"><h2 id="betsTitle">My bets</h2><button class="lbtn" data-close>Close</button></div>
+  <div class="dlg-b" id="betsBody"></div>
 </dialog>
 
 <div class="toast" id="toast" role="status"></div>
@@ -430,9 +580,13 @@ async function fetchJSON(path, bust){
   if (!r.ok) throw new Error(path + ' ' + r.status);
   return r.json();
 }
-function normApi(x){
+function normApi(x, sport){
   const g = {}; FIELDS.forEach(f => g[f] = null);
   for (const f of FIELDS) if (x[f] !== undefined) g[f] = x[f];
+  if (!isNum(g.season) && isNum(g.date)){
+    const y = Math.floor(g.date / 10000), m = Math.floor(g.date / 100) % 100;
+    g.season = isHoops(sport) ? (m >= 8 ? y : y - 1) : (m >= 6 ? y : y - 1);
+  }
   g.post = !!x.post; g.neu = !!x.neu; g.div = x.div === undefined ? (x.hc && x.ac ? false : null) : !!x.div;
   if (!isNum(g.hs) || !isNum(g.as)){ g.hs = null; g.as = null; }
   g.k = gameKey(g);
@@ -447,7 +601,7 @@ async function loadRemote(sport){
   let espn = [];
   if (ent.api?.length){
     const files = await Promise.all(ent.api.map(s => fetchJSON(`data/api/${sport}/${s}.json`, v).catch(() => null)));
-    files.forEach(f => { if (f) f.games.forEach(x => espn.push(normApi(x))); });
+    files.forEach(f => { if (f) f.games.forEach(x => espn.push(normApi(x, sport))); });
   }
   // Per season, use whichever source has more complete lines.
   const cnt = (arr) => { const m = {}; arr.forEach(g => { const o = m[g.season] ||= { n:0, sp:0, spO:0 }; o.n++; if (isNum(g.sp)) o.sp++; if (isNum(g.spO)) o.spO++; }); return m; };
@@ -457,7 +611,7 @@ async function loadRemote(sport){
   // Sportsbook Review archive: fill opening lines (and anything missing) by matching date + final score.
   if (ent.archive?.length){
     const files = await Promise.all(ent.archive.map(s => fetchJSON(`data/archive/${sport}/${s}.json`, v).catch(() => null)));
-    const arch = []; files.forEach(f => { if (f) f.games.forEach(x => arch.push(normApi(x))); });
+    const arch = []; files.forEach(f => { if (f) f.games.forEach(x => arch.push(normApi(x, sport))); });
     const key = (d, h, a) => d + '|' + h + '|' + a;
     const idx = new Map(), dup = new Set();
     games.forEach(g => { if (!isNum(g.hs)) return; const k = key(g.date, g.hs, g.as); if (idx.has(k)) dup.add(k); idx.set(k, g); });
@@ -553,13 +707,17 @@ function gamesFor(sport){
 }
 
 /* ---------- team-perspective rows with situational context ---------- */
+const okML = v => isNum(v) && Math.abs(v) >= 100 ? v : null;
 function buildRows(games){
   const gs = games.filter(g => g.home && g.away && g.season && g.date).slice()
     .sort((a,b)=> a.date - b.date || (a.week??0)-(b.week??0) || (a.k < b.k ? -1 : 1));
   const st = new Map(); // team -> state
   const rows = [];
+  // Unplayed games more than 3 days old are treated as postponed/cancelled, not as pending.
+  const staleBefore = (t => t.getUTCFullYear()*10000 + (t.getUTCMonth()+1)*100 + t.getUTCDate())(new Date(dnToMs(TODAY) - 3 * dayMs));
   for (const g of gs){
     const done = isNum(g.hs) && isNum(g.as);
+    const pending = !done && g.date >= staleBefore;
     const pair = [];
     for (const H of [true,false]){
       const team = H ? g.home : g.away, opp = H ? g.away : g.home;
@@ -577,7 +735,7 @@ function buildRows(games){
       else if (g.hc && g.ac) conf = String(g.hc).toLowerCase() === String(g.ac).toLowerCase();
       const r = {
         g, H, team, opp, done, sp, spO, mv: (isNum(sp) && isNum(spO)) ? +(sp - spO).toFixed(1) : null,
-        ml: H ? g.hml : g.aml, oml: H ? g.aml : g.hml, tot: g.tot,
+        ml: okML(H ? g.hml : g.aml), oml: okML(H ? g.aml : g.hml), tot: g.tot,
         spOdds: H ? g.hso : g.aso,
         pf, pa, mg, atsM: (done && isNum(sp)) ? mg + sp : null,
         prevW: s.last ? s.last.w : null, prevAts: s.last ? s.last.ats : null, prevM: s.last ? s.last.mg : null,
@@ -598,9 +756,12 @@ function buildRows(games){
     }
     for (const r of pair){
       r.restAdv = isNum(r.rest) && isNum(r.oRest) ? r.rest - r.oRest : null;
+      // A future game only counts as "next" if this team has no other unplayed game before it.
+      r.notNext = pending && !!r.s.pend;
       delete r.s;
       rows.push(r);
     }
+    if (pending) for (const r of pair) st.get(r.team).pend = true;
     if (done){
       for (const r of pair){
         const s = st.get(r.team);
@@ -735,7 +896,8 @@ const isActive = (d, v) => v !== undefined && v !== null && (d.type==='multi' ? 
 function activeIds(f){ return ALLF.filter(d => isActive(d, f[d.id])).map(d => d.id); }
 
 function makeTester(f, skip){
-  const tests = ALLF.filter(d => d.id !== skip && isActive(d, f[d.id])).map(d => {
+  const skips = new Set([].concat(skip || []));
+  const tests = ALLF.filter(d => !skips.has(d.id) && isActive(d, f[d.id])).map(d => {
     const v = f[d.id];
     if (d.type === 'range'){
       const lo = v[0] === '' ? -Infinity : +v[0], hi = v[1] === '' ? Infinity : +v[1];
@@ -759,7 +921,7 @@ function gradeRow(r, bet, juice){
     return { odds, res, line: r.sp, margin: r.done ? r.atsM : null };
   }
   if (bet === 'ml'){
-    if (!isNum(r.ml)) return null;
+    if (!isNum(r.ml) || Math.abs(r.ml) < 100) return null;
     const res = !r.done ? null : r.mg > 0 ? 'W' : r.mg < 0 ? 'L' : 'P';
     return { odds: r.ml, res, line: null, margin: r.done ? r.mg : null };
   }
@@ -771,27 +933,30 @@ function gradeRow(r, bet, juice){
   return { odds, res, line: r.tot, margin };
 }
 function evaluate(opts = {}){
-  const f = opts.f || state.f, sport = state.sport;
+  const f = opts.f || state.f, sport = opts.sport || state.sport;
+  const fade = opts.fade ?? state.fade, hideDup = opts.hideDup ?? state.hideDup;
   const rows = data.rows[sport] || [];
   const test = makeTester(f, opts.skip);
+  // Upcoming games ignore the season filter: seasons pick which history to test, not which games to bet.
+  const upTest = makeTester(f, [].concat(opts.skip || [], 'season'));
   const juice = isNum(+state.juice) && +state.juice !== 0 ? +state.juice : -110;
-  let bet = state.bet;
+  let bet = opts.bet || state.bet;
   const totals = bet === 'over' || bet === 'under';
-  if (state.fade && totals) bet = bet === 'over' ? 'under' : 'over';
-  const pass = rows.filter(test);
+  if (fade && totals) bet = bet === 'over' ? 'under' : 'over';
+  const pass = rows.filter(r => r.done ? test(r) : upTest(r));
   let use = pass;
-  if (!totals && state.hideDup){
+  if (!totals && hideDup){
     const cnt = new Map(); pass.forEach(r => cnt.set(r.g.k, (cnt.get(r.g.k) || 0) + 1));
     use = pass.filter(r => cnt.get(r.g.k) === 1);
   }
   const seen = new Set(), bets = [], upcoming = [];
   for (const r of use){
     if (totals){ if (seen.has(r.g.k)) continue; seen.add(r.g.k); }
-    const side = (!totals && state.fade) ? r.pair : r;
+    const side = (!totals && fade) ? r.pair : r;
     const gr = gradeRow(side, bet, juice);
     if (!gr) continue;
     if (r.done) bets.push({ r, side, ...gr, u: profit(gr.res, gr.odds) });
-    else if (r.g.date >= TODAY) upcoming.push({ r, side, ...gr });
+    else if (r.g.date >= TODAY && !r.notNext && !r.pair.notNext) upcoming.push({ r, side, ...gr });
   }
   return summarize(bets, upcoming);
 }
@@ -803,7 +968,18 @@ function summarize(bets, upcoming){
     if (b.res !== 'P'){ const p = implied(b.odds); ep += p; ev += p*(1-p); }
   }
   const z = ev > 0 ? (W - ep) / Math.sqrt(ev) : 0;
-  return { bets, upcoming: upcoming || [], W, L, P, U, n: bets.length, z, be: (W+L) ? ep/(W+L) : null, margin: mn ? M/mn : null };
+  // risk: worst losing streak, biggest drop from a high point, recent and worst seasons
+  let cur = 0, skid = 0, cum = 0, peak = 0, dd = 0; const bySea = new Map();
+  for (const b of bets){
+    if (b.res === 'L'){ cur++; if (cur > skid) skid = cur; } else if (b.res === 'W') cur = 0;
+    cum += b.u; if (cum > peak) peak = cum; if (peak - cum > dd) dd = peak - cum;
+    const s = b.r.g.season; bySea.set(s, (bySea.get(s) || 0) + b.u);
+  }
+  const sea = [...bySea.entries()].sort((a,b) => a[0] - b[0]);
+  const last3 = sea.slice(-3);
+  const worst = sea.length ? sea.reduce((m, x) => x[1] < m[1] ? x : m) : null;
+  const risk = { skid, dd, recentUp: last3.filter(x => x[1] > 0).length, recentN: last3.length, worst };
+  return { bets, upcoming: upcoming || [], W, L, P, U, n: bets.length, z, be: (W+L) ? ep/(W+L) : null, margin: mn ? M/mn : null, risk };
 }
 function grade(res){
   const n = res.W + res.L;
@@ -876,7 +1052,7 @@ $('#sideToggle').addEventListener('click', () => { const s = $('.side'); const o
 function renderFilterTable(){
   const ids = activeIds(state.f);
   const host = $('#filterTable');
-  if (!ids.length){ host.innerHTML = '<div class="empty">No filters yet. Pick one from the list on the left.</div>'; return; }
+  if (!ids.length){ host.innerHTML = '<div class="empty">No filters yet. Pick one from the filter list.</div>'; return; }
   host.innerHTML = `<table><thead><tr><th></th><th>Filter</th><th>Details</th><th></th></tr></thead><tbody>${
     ids.map(id => { const d = FBYID[id]; return `<tr><td class="act"><button class="lbtn" data-edit="${id}">Edit</button></td><td>${esc(d.label)} <span class="muted">· ${d.cat.name}</span></td><td>${esc(filterDetail(d, state.f[id]))}</td><td class="act"><button class="lbtn del" data-del="${id}" aria-label="Remove ${esc(d.label)}">Remove</button></td></tr>`; }).join('')
   }</tbody></table>`;
@@ -897,6 +1073,16 @@ function renderKPIs(res){
   setV('#kMoney', money(res.U), res.U > 0 ? 'pos' : res.U < 0 ? 'neg' : '');
   setV('#kRoi', res.n ? (res.U/res.n*100).toFixed(1) + '%' : '–', res.U > 0 ? 'pos' : res.U < 0 ? 'neg' : '');
   const g = grade(res); setV('#kGrade', g === 'x' ? '–' : g, 'grade g-' + g);
+  const rk = res.risk, rr = $('#riskRow');
+  if (!res.n){ rr.innerHTML = ''; }
+  else {
+    const chip = (k, v, cls, tip) => `<div class="kpi" title="${tip}"><span class="k">${k}</span><span class="v ${cls || ''}">${v}</span></div>`;
+    rr.innerHTML = `<span class="risk-label">Risk</span>` +
+      chip('Worst skid', `${rk.skid} loss${rk.skid === 1 ? '' : 'es'}`, '', 'Most losses in a row') +
+      chip('Max drawdown', money(-rk.dd), rk.dd > 0 ? 'bad' : '', 'Biggest drop from a high point, betting $100 a game') +
+      chip(`Last ${rk.recentN} season${rk.recentN === 1 ? '' : 's'}`, `${rk.recentUp} of ${rk.recentN} up`, rk.recentUp === rk.recentN ? 'good' : rk.recentUp === 0 ? 'bad' : '', 'How many of the most recent seasons made money') +
+      (rk.worst ? chip('Worst season', `${money(rk.worst[1])} (${seasonLabel(state.sport, rk.worst[0])})`, rk.worst[1] < 0 ? 'bad' : 'good', 'The season with the least profit') : '');
+  }
   const n = res.W + res.L, be = res.be ? (res.be*100).toFixed(1) + '%' : '';
   let msg;
   if (!res.n) msg = (data.rows[state.sport]?.length ? 'No graded games match these filters.' : 'No games loaded for this sport yet.');
@@ -920,7 +1106,8 @@ function cumChart(bets, opts = {}){
   let d = ''; for (let i=0;i<pts.length;i+=step) d += (d ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(pts[i]).toFixed(1);
   d += 'L' + x(pts.length-1).toFixed(1) + ' ' + y(pts[pts.length-1]).toFixed(1);
   const y0 = y(0).toFixed(1), uid = 'c' + Math.random().toString(36).slice(2,7);
-  const ticks = [...new Set([mn, mn/2, 0, mx/2, mx].map(v => Math.round(v)))];
+  const ticks = [];
+  [0, mn, mx, mn/2, mx/2].map(v => Math.round(v)).forEach(v => { if (ticks.every(u => Math.abs(y(u) - y(v)) >= 16)) ticks.push(v); });
   let marks = '', prevS = null, nS = 0;
   bets.forEach((b,i) => { if (b.r.g.season !== prevS){ prevS = b.r.g.season; nS++; } });
   if (nS <= 16){ prevS = null; bets.forEach((b,i) => { if (b.r.g.season !== prevS){ prevS = b.r.g.season; const xx = x(i).toFixed(1); marks += `<line x1="${xx}" x2="${xx}" y1="${pt}" y2="${H-pb}" stroke="var(--line)" stroke-dasharray="2 3"/><text x="${(+xx)+3}" y="${H-8}" font-size="11" fill="var(--muted)">${seasonShort(state.sport, b.r.g.season)}</text>`; } }); }
@@ -956,7 +1143,8 @@ function renderTab(res){
   if (state.tab === 'matches'){
     const up = res.upcoming.slice().sort((a,b)=>a.r.g.date-b.r.g.date);
     if (!up.length){ el.innerHTML = '<div class="empty">No upcoming games match this system right now. Lines for new games load with each daily update, usually a few days ahead.</div>'; return; }
-    el.innerHTML = up.map(b => `<div class="match"><div class="when">${fmtShort(b.r.g.date)}${isNum(b.r.g.week)?`<br>Week ${b.r.g.week}`:''}</div><div><div class="pick">${betLabel(b)}</div><div class="muted">${matchup(b.r)}</div></div><div class="odds">${fmtOdds(b.odds)}</div></div>`).join('')
+    const eff = effBet(state.bet, state.fade);
+    el.innerHTML = up.map(b => { const i = regPick(pickFrom(b, state.sport, eff, [state.name || 'Untitled system'])); return `<div class="match"><div class="when">${fmtShort(b.r.g.date)}${isNum(b.r.g.week)?`<br>Week ${b.r.g.week}`:''}</div><div><div class="pick">${betLabel(b)}</div><div class="muted">${matchup(b.r)}</div></div><div class="right"><div class="odds">${fmtOdds(b.odds)}</div>${logButton(i)}</div></div>`; }).join('')
       + '<div class="note">Prices are from the daily data update. Check your sportsbook before betting.</div>';
     return;
   }
@@ -1116,14 +1304,16 @@ $('#fRemove').addEventListener('click', () => { if (!edit) return; delete state.
 $('#dlgFilter').addEventListener('close', () => { edit = null; });
 
 /* ---------- sport switching ---------- */
+async function ensureSport(sport){
+  if (data.rows[sport]) return;
+  try{ await loadRemote(sport); }catch(e){ toast('Couldn’t load game data. Check your connection and reload.'); remote.games[sport] = []; }
+  try{ await loadImported(sport); }catch(e){ data.imported[sport] = []; }
+  data.rows[sport] = buildRows(gamesFor(sport));
+}
 async function setSport(sport){
   state.sport = sport; $('#sport').value = sport;
   $('#dataStatus').textContent = 'Loading games…';
-  if (!data.rows[sport]){
-    try{ await loadRemote(sport); }catch(e){ toast('Couldn’t load game data. Check your connection and reload.'); remote.games[sport] = []; }
-    try{ await loadImported(sport); }catch(e){ data.imported[sport] = []; }
-    data.rows[sport] = buildRows(gamesFor(sport));
-  }
+  await ensureSport(sport);
   const rows = data.rows[sport];
   const seasons = [...new Set(rows.map(r=>r.g.season))].sort();
   const graded = rows.filter(r=>r.done).length/2, up = rows.filter(r=>!r.done && r.g.date >= TODAY).length/2;
@@ -1263,8 +1453,9 @@ async function loadSystem(s){
   syncInputs();
   recompute();
 }
-function migrate(f){
-  const rows = data.rows[state.sport] || [];
+function migrate(f){ return migrateFor(f, state.sport); }
+function migrateFor(f, sport){
+  const rows = data.rows[sport] || [];
   const s = f.season;
   if (Array.isArray(s) && s.length === 2 && (s[0] === '' || s[1] === '' || !isNaN(+s[0])) && typeof s[0] === 'string' && !s.some(x => x && x.length !== 4)){
     const lo = s[0] === '' ? -Infinity : +s[0], hi = s[1] === '' ? Infinity : +s[1];
@@ -1307,22 +1498,213 @@ $('#saveSystem').addEventListener('click', async () => {
 $('#newSystem').addEventListener('click', () => { Object.assign(state, { id:null, name:'Untitled system', f:{}, theory:'', fade:false, hideDup:false }); syncInputs(); recompute(); $('#sysName').select(); });
 $('#openSystems').addEventListener('click', () => { renderSystems(); $('#dlgSystems').showModal(); });
 $('#sysCopy').addEventListener('click', async () => {
-  const text = 'BETLAB1:' + btoa(unescape(encodeURIComponent(JSON.stringify(systems))));
-  try{ await navigator.clipboard.writeText(text); toast(`Copied ${systems.length} systems. Paste them on your other device.`); }
+  const text = 'BETLAB2:' + btoa(unescape(encodeURIComponent(JSON.stringify({ systems, bets }))));
+  try{ await navigator.clipboard.writeText(text); toast(`Copied ${systems.length} systems and ${bets.length} bets. Paste them on your other device.`); }
   catch(e){ prompt('Copy this text:', text); }
 });
 $('#sysPaste').addEventListener('click', async () => {
   let text = '';
   try{ text = await navigator.clipboard.readText(); }catch(e){}
-  if (!text || !text.startsWith('BETLAB1:')) text = prompt('Paste the copied systems text:') || '';
-  if (!text.startsWith('BETLAB1:')){ if (text) toast('That isn’t copied systems text.'); return; }
+  const ok = x => x && (x.startsWith('BETLAB1:') || x.startsWith('BETLAB2:'));
+  if (!ok(text)) text = prompt('Paste the copied systems text:') || '';
+  if (!ok(text)){ if (text) toast('That isn’t copied systems text.'); return; }
   try{
-    const list = JSON.parse(decodeURIComponent(escape(atob(text.slice(8)))));
-    let added = 0;
+    const obj = JSON.parse(decodeURIComponent(escape(atob(text.slice(8)))));
+    const list = Array.isArray(obj) ? obj : (obj.systems || []), blist = Array.isArray(obj) ? [] : (obj.bets || []);
+    let added = 0, addedB = 0;
     list.forEach(s => { if (s && s.id && s.f && !systems.some(x => x.id === s.id)){ systems.push(s); added++; } });
-    await persistSystems(); renderSystems(); toast(`Added ${added} systems.`);
+    blist.forEach(b => { if (b && b.id && !bets.some(x => x.id === b.id)){ bets.push(b); addedB++; } });
+    await persistSystems(); if (addedB) await persistBets(); renderSystems(); toast(`Added ${added} systems and ${addedB} bets.`);
   }catch(e){ toast('Couldn’t read that text. Copy it again and retry.'); }
 });
+
+/* ---------- Crab Picks (pre-built systems) ---------- */
+// Each pick was found on seasons before testFrom, then checked on testFrom and later.
+const PICKS = [{"id": "nfl-wind-under", "tier": "held", "sport": "NFL", "bet": "under", "fade": false, "f": {"wind": ["15", ""]}, "testFrom": 2018, "name": "Windy unders", "theory": "Wind of 15+ mph hurts passing and kicking more than the market adjusts for. Totals stay a little too high."}, {"id": "nfl-road-short-dog", "tier": "held", "sport": "NFL", "bet": "spread", "fade": false, "f": {"venue": "away", "sp": ["1", "3"]}, "testFrom": 2018, "name": "Road short dogs", "theory": "Road underdogs of 1 to 3 points are close to even teams, but the public pays extra for the home favorite. The points are worth more than the price."}, {"id": "nfl-div-road-dog-ml", "tier": "held", "sport": "NFL", "bet": "ml", "fade": false, "f": {"venue": "away", "sp": ["1", "3"], "conf": "yes"}, "testFrom": 2018, "name": "Division road dogs to win outright", "theory": "Division rivals know each other well, so short road underdogs win outright more often than the moneyline implies."}, {"id": "nfl-buy-the-slump", "tier": "held", "sport": "NFL", "bet": "spread", "fade": false, "f": {"role": "dog", "atsStrk": "l3", "oWp": ["60", ""]}, "testFrom": 2018, "name": "Buy the cover slump", "theory": "An underdog that has failed to cover 3+ straight games, facing a winning team (60%+), gets priced at its worst. The market overreacts to the slump and to the opponent’s record."}, {"id": "nfl-short-dog-line-away", "tier": "held", "sport": "NFL", "bet": "spread", "fade": false, "f": {"sp": ["1", "3"], "mvdir": "against"}, "testFrom": 2018, "name": "Short dogs the market moved away from", "theory": "When the line moves against a short underdog, the extra points often overshoot. Taking the bigger number has paid. (Needs opening lines: 2011 to 2021 and from this season on.)"}, {"id": "nfl-road-dogs-vs-home-fav-off-loss", "tier": "held", "sport": "NFL", "bet": "spread", "fade": false, "f": {"venue": "away", "role": "dog", "sp": ["1", "3"], "oPrevW": "l"}, "testFrom": 2021, "name": "Short road dogs vs. a home team off a loss", "theory": "A home team coming off a loss gets backed to bounce back, so it’s a small favorite more often than it should be. Take the road underdog getting 1 to 3 points."}, {"id": "nfl-short-road-dogs-skid", "tier": "held", "sport": "NFL", "bet": "spread", "fade": false, "f": {"venue": "away", "role": "dog", "sp": ["1", "3"], "strk": "l2"}, "testFrom": 2021, "name": "Short road dogs on a losing streak", "theory": "Teams that have lost two or more straight get written off. As road underdogs of 1 to 3 points, they’ve covered more than the market expects."}, {"id": "ncaaf-short-dog-vs-loser-ml", "tier": "held", "sport": "NCAAF", "bet": "ml", "fade": false, "f": {"sp": ["1", "3"], "oPrevW": "l"}, "testFrom": 2017, "name": "Short dogs vs. a team off a loss", "theory": "A favorite coming off a loss gets credit for “bouncing back,” while short underdogs are near coin flips. The underdog moneyline pays more than it should."}, {"id": "ncaaf-road-dog-after-miss-ml", "tier": "held", "sport": "NCAAF", "bet": "ml", "fade": false, "f": {"venue": "away", "sp": ["1", "3"], "prevAts": "l"}, "testFrom": 2017, "name": "Road short dogs after a failed cover", "theory": "Bettors sour on a team right after it fails to cover. As a short road underdog its moneyline gets too generous."}, {"id": "ncaaf-double-bounce-ml", "tier": "held", "sport": "NCAAF", "bet": "ml", "fade": false, "f": {"sp": ["1", "3"], "prevAts": "l", "oPrevW": "l"}, "testFrom": 2017, "name": "Short dog bounce-back spot", "theory": "Both teams are coming off bad results, but the market only marks down the underdog. Short underdogs that just failed to cover, facing an opponent off a loss, have won outright often enough to profit."}, {"id": "cfb-early-home-dogs", "tier": "held", "sport": "NCAAF", "bet": "spread", "fade": false, "f": {"venue": "home", "role": "dog", "sp": ["3.5", "7"], "gp": ["", "2"]}, "testFrom": 2021, "name": "Early-season home underdogs", "theory": "In the first three games, lines lean on preseason expectations. Home underdogs of 3.5 to 7 points have covered before the market catches up."}, {"id": "cfb-fade-home-fav-off-blowout", "tier": "watch", "sport": "NCAAF", "bet": "spread", "fade": true, "f": {"venue": "home", "role": "fav", "sp": ["-14", "-7.5"], "prevM": ["", "-14"]}, "testFrom": 2021, "name": "Road dogs vs. a home favorite off a blowout loss", "theory": "A home favorite of 7.5 to 14 that just lost by 14+ gets backed to bounce back, and the road underdog has covered. This is a faded system: the filters describe the home favorite, and the bet is the other side."}, {"id": "nba-road-fav-off-blowout", "tier": "watch", "sport": "NBA", "bet": "spread", "fade": false, "f": {"venue": "away", "role": "fav", "sp": ["-3", "-1"], "prevM": ["", "-14"]}, "testFrom": 2021, "name": "Short road favorites off a blowout loss", "theory": "A good team that just got blown out by 14+ tends to respond. As a road favorite of 1 to 3 points it has covered, though the edge has been thinner in recent seasons."}];
+const PICK_NOTES = {
+  NBA: 'Only one NBA system made the list, and it’s on the watch list. NBA lines are among the sharpest in sports: almost every angle that looked good on older seasons faded later.',
+  NCAAB: 'No college basketball system has passed testing yet. Candidates get re-checked as more past seasons finish loading.'
+};
+let pickSport = 'NFL';
+function statBox(label, sub, r){
+  const n = r.W + r.L;
+  return `<div class="pstat"><div class="k">${label}</div><div class="v ${r.U > 0 ? 'W' : r.U < 0 ? 'L' : ''}">${money(r.U)}</div><div class="s">${r.W}-${r.L}${r.P ? '-' + r.P : ''} (${pct(r.W, n)}), ROI ${r.n ? (r.U / r.n * 100).toFixed(1) + '%' : '–'}</div><div class="s">${sub}</div></div>`;
+}
+async function renderPicks(){
+  $('#pickTabs').innerHTML = ['NFL','NCAAF','NBA','NCAAB'].map(s => `<button data-ps="${s}" aria-pressed="${s === pickSport}">${SPORT_NAMES[s]} (${PICKS.filter(p => p.sport === s).length})</button>`).join('');
+  const host = $('#pickList');
+  host.innerHTML = '<div class="empty">Running the systems…</div>';
+  await ensureSport(pickSport);
+  const rows = data.rows[pickSport] || [];
+  const seasons = [...new Set(rows.map(r => r.g.season))].sort((a,b) => a-b);
+  const rng = arr => arr.length ? (arr.length === 1 ? seasonLabel(pickSport, +arr[0]) : `${seasonLabel(pickSport, +arr[0])} to ${seasonLabel(pickSport, +arr[arr.length-1])}`) : '';
+  let html = PICKS.filter(p => p.sport === pickSport).map(p => {
+    const tr = seasons.filter(s => s < p.testFrom).map(String), te = seasons.filter(s => s >= p.testFrom).map(String);
+    const ev = f => evaluate({ sport: p.sport, bet: p.bet, fade: !!p.fade, hideDup: false, f });
+    const all = ev(p.f), a = ev({ ...p.f, season: tr }), b = ev({ ...p.f, season: te });
+    const g = grade(all), up = all.upcoming.length;
+    const rule = describe(p).split('; ').slice(1).join('; ');
+    return `<div class="pick-card"><div class="pick-head"><h3>${esc(p.name)}</h3><span class="tier ${p.tier}">${p.tier === 'held' ? 'Held up in testing' : 'Watch list: thinner recent edge'}</span></div>
+      <p>${esc(p.theory)}</p><div class="pick-rule">${esc(rule)}</div>
+      <div class="pstats">${statBox('Tested on', rng(te) + ', seasons it never saw', b)}${statBox('Found on', rng(tr), a)}${statBox('All seasons', `Grade ${g === 'x' ? '–' : g}`, all)}</div>
+      <div class="pick-rule">Risk: worst skid ${all.risk.skid} losses in a row, biggest drawdown ${money(-all.risk.dd)}, ${all.risk.recentUp} of the last ${all.risk.recentN} seasons profitable.</div>
+      <div class="pick-foot"><span class="muted" style="font-size:13px">${up ? `${up} upcoming game${up > 1 ? 's' : ''} fit this system.` : 'No upcoming games fit right now.'}</span><button class="btn primary" data-open="${p.id}">Open in builder</button></div></div>`;
+  }).join('');
+  if (PICK_NOTES[pickSport]) html += `<div class="note">${PICK_NOTES[pickSport]}</div>`;
+  html += '<div class="note">Past results don’t guarantee future ones. Any system can look good by luck; the tested-on numbers are the honest check.</div>';
+  host.innerHTML = html;
+}
+$('#openPicks').addEventListener('click', () => { $('#dlgPicks').showModal(); renderPicks(); });
+$('#pickTabs').addEventListener('click', e => { const b = e.target.closest('[data-ps]'); if (!b) return; pickSport = b.dataset.ps; renderPicks(); });
+$('#pickList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-open]'); if (!b) return;
+  const p = PICKS.find(x => x.id === b.dataset.open); if (!p) return;
+  $('#dlgPicks').close();
+  await loadSystem({ id: null, name: p.name, sport: p.sport, bet: p.bet, f: JSON.parse(JSON.stringify(p.f)), theory: p.theory, fade: !!p.fade, hideDup: false, juice: -110 });
+  state.id = null;
+  state.tab = 'matches'; document.querySelectorAll('.tabs [data-tab]').forEach(x => x.setAttribute('aria-selected', String(x.dataset.tab === 'matches'))); recompute();
+  toast('Crab Pick opened. Save it to keep your own copy.');
+});
+
+/* ---------- picks registry (for Log bet buttons) ---------- */
+const effBet = (bet, fade) => (bet === 'over' || bet === 'under') && fade ? (bet === 'over' ? 'under' : 'over') : bet;
+function pickFrom(b, sport, bet, systems){
+  const tot = bet === 'over' || bet === 'under';
+  return { sport, k: b.r.g.k, date: b.r.g.date, home: b.r.g.home, away: b.r.g.away, bet,
+    side: tot ? (bet === 'over' ? 'Over' : 'Under') : b.side.team, line: bet === 'ml' ? null : b.line, odds: b.odds, systems };
+}
+function pickText(p){
+  if (p.bet === 'over' || p.bet === 'under') return `${p.side} ${p.line}`;
+  if (p.bet === 'spread') return `${p.side} ${fmtLine(p.line)}`;
+  return `${p.side} moneyline`;
+}
+const REG = [];
+function regPick(p){ REG.push(p); return REG.length - 1; }
+const pickId = p => `${p.sport}|${p.k}|${p.bet === 'over' || p.bet === 'under' ? 'tot' : p.bet}|${p.side}`;
+function logButton(i){ const p = REG[i]; const done = bets.some(b => b.pid === pickId(p)); return `<button class="logbtn${done ? ' done' : ''}" data-log="${i}">${done ? 'Logged ✓' : 'Log bet'}</button>`; }
+document.addEventListener('click', e => { const b = e.target.closest('[data-log]'); if (b) openLog(REG[+b.dataset.log]); });
+
+/* ---------- bet log ---------- */
+let bets = [];
+async function loadBets(){ try{ const d = await store.get('bets'); bets = d && Array.isArray(d.list) ? d.list : []; }catch(e){ bets = []; } }
+async function persistBets(){ await store.set('bets', { list: bets }); }
+let logging = null;
+function openLog(p){
+  logging = p;
+  $('#logPick').textContent = pickText(p);
+  $('#logGame').textContent = `${SPORT_NAMES[p.sport]}: ${p.away} @ ${p.home}, ${fmtShort(p.date)}${p.systems?.length ? ' · ' + p.systems.join(', ') : ''}`;
+  $('#logLineWrap').hidden = p.bet === 'ml';
+  $('#logLine').value = isNum(p.line) ? p.line : '';
+  $('#logOdds').value = isNum(p.odds) ? p.odds : -110;
+  $('#logStake').value = $('#logStake').value || 100;
+  $('#dlgLog').showModal();
+}
+$('#logGo').addEventListener('click', async () => {
+  if (!logging) return;
+  const odds = +$('#logOdds').value, stake = +$('#logStake').value, line = $('#logLine').value === '' ? null : +$('#logLine').value;
+  if (!isNum(odds) || Math.abs(odds) < 100){ toast('Enter a price like -110 or +150.'); return; }
+  if (!(stake > 0)){ toast('Enter how much you risked.'); return; }
+  if (logging.bet !== 'ml' && !isNum(line)){ toast('Enter the line you got.'); return; }
+  const b = { id: 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2,5), pid: pickId(logging), sport: logging.sport, k: logging.k, date: logging.date, home: logging.home, away: logging.away,
+    bet: logging.bet, side: logging.side, line, odds, stake, systems: logging.systems || [], placed: Date.now() };
+  bets.unshift(b);
+  try{ await persistBets(); $('#dlgLog').close(); toast('Bet logged. It grades itself after the game.'); document.querySelectorAll(`[data-log]`).forEach(x => { const p = REG[+x.dataset.log]; if (p && pickId(p) === b.pid){ x.textContent = 'Logged ✓'; x.classList.add('done'); } }); }
+  catch(e){ bets.shift(); toast('Couldn’t save the bet. Try again.'); }
+});
+function gradeBet(b){
+  const rows = data.rows[b.sport]; if (!rows) return null;
+  const tot = b.bet === 'over' || b.bet === 'under';
+  const r = rows.find(x => x.g.k === b.k && (tot || x.team === b.side));
+  if (!r || !r.done) return { res: null };
+  let res;
+  if (b.bet === 'spread'){ const m = r.mg + b.line; res = m > 0 ? 'W' : m < 0 ? 'L' : 'P'; }
+  else if (b.bet === 'ml'){ res = r.mg > 0 ? 'W' : r.mg < 0 ? 'L' : 'P'; }
+  else { const pts = r.pf + r.pa; res = pts === b.line ? 'P' : ((pts > b.line) === (b.bet === 'over') ? 'W' : 'L'); }
+  return { res, won: b.stake * profit(res, b.odds), final: `${r.g.away} ${r.g.as}, ${r.g.home} ${r.g.hs}` };
+}
+async function renderBets(){
+  const host = $('#betsBody');
+  if (!bets.length){ host.innerHTML = '<div class="empty">No bets logged yet. Tap <b>Log bet</b> next to any upcoming game, under Upcoming matches or on Today’s board.</div>'; return; }
+  host.innerHTML = '<div class="empty">Grading…</div>';
+  for (const s of [...new Set(bets.map(b => b.sport))]) await ensureSport(s);
+  const graded = bets.map(b => ({ b, g: gradeBet(b) }));
+  const done = graded.filter(x => x.g && x.g.res), pend = graded.filter(x => !x.g || !x.g.res);
+  const sum = list => { const o = { W:0, L:0, P:0, won:0, risked:0 }; list.forEach(x => { o[x.g.res]++; o.won += x.g.won; o.risked += x.b.stake; }); return o; };
+  const all = sum(done);
+  const kp = (k, v, cls) => `<div class="kpi"><span class="k">${k}</span><span class="v ${cls || ''}">${v}</span></div>`;
+  const cls = v => v > 0 ? 'pos' : v < 0 ? 'neg' : '';
+  const usd = v => (v < 0 ? '−$' : v > 0 ? '+$' : '$') + Math.abs(Math.round(v)).toLocaleString();
+  let html = `<div class="kpis">${kp('Record', `${all.W}-${all.L}-${all.P}`)}${kp('Won', usd(all.won), cls(all.won))}${kp('ROI', all.risked ? (all.won / all.risked * 100).toFixed(1) + '%' : '–', cls(all.won))}${kp('Pending', pend.length)}</div>`;
+  const bySys = new Map();
+  done.forEach(x => (x.b.systems.length ? x.b.systems : ['No system']).forEach(s => { if (!bySys.has(s)) bySys.set(s, []); bySys.get(s).push(x); }));
+  if (bySys.size){
+    html += `<div class="tscroll"><table class="data"><thead><tr><th>System</th><th class="num">W-L-P</th><th class="num">Won</th><th class="num">ROI</th></tr></thead><tbody>${[...bySys.entries()].map(([s, list]) => { const o = sum(list); return `<tr><td>${esc(s)}</td><td class="num">${o.W}-${o.L}-${o.P}</td><td class="num ${o.won >= 0 ? 'W' : 'L'}">${usd(o.won)}</td><td class="num">${(o.won / o.risked * 100).toFixed(1)}%</td></tr>`; }).join('')}</tbody></table></div><div class="note" style="margin-top:-4px">A bet that fit more than one system counts toward each.</div>`;
+  }
+  const row = x => { const b = x.b, g = x.g;
+    const right = g && g.res ? `<div class="res"><span class="${g.res}">${g.res === 'W' ? 'Win' : g.res === 'L' ? 'Loss' : 'Push'}</span> <b class="${g.won > 0 ? 'W' : g.won < 0 ? 'L' : ''}">${usd(g.won)}</b></div>` : `<div class="res"><span class="badge-p">${b.date < TODAY ? 'Waiting for score' : 'Pending'}</span></div>`;
+    return `<div class="betrow"><div><div class="pick">${esc(pickText(b))} <span class="muted" style="font-weight:400">${fmtOdds(b.odds)}, $${b.stake}</span></div><div class="meta">${SPORT_NAMES[b.sport]}: ${esc(b.away)} @ ${esc(b.home)}, ${fmtShort(b.date)}${g && g.final ? ' · Final: ' + esc(g.final) : ''}${b.systems.length ? ' · ' + esc(b.systems.join(', ')) : ''}</div></div>${right}<button class="lbtn del" data-delbet="${b.id}">Delete</button></div>`; };
+  if (pend.length) html += `<h3 style="font-family:var(--fd);margin:6px 0 0">Pending</h3>${pend.map(row).join('')}`;
+  if (done.length) html += `<h3 style="font-family:var(--fd);margin:6px 0 0">Graded</h3>${done.sort((a,b) => b.b.date - a.b.date).map(row).join('')}`;
+  html += '<div class="note">Bets are saved in this browser. To move them to another device, use Systems → Copy systems and bets.</div>';
+  host.innerHTML = html;
+}
+$('#openBets').addEventListener('click', () => { $('#dlgBets').showModal(); renderBets(); });
+$('#betsBody').addEventListener('click', async e => {
+  const b = e.target.closest('[data-delbet]'); if (!b) return;
+  const x = bets.find(y => y.id === b.dataset.delbet); if (!x || !confirm(`Delete the bet on ${pickText(x)}?`)) return;
+  bets = bets.filter(y => y !== x);
+  try{ await persistBets(); }catch(err){ toast('Couldn’t delete. Try again.'); }
+  renderBets(); recompute();
+});
+
+/* ---------- Today's board ---------- */
+let boardDays = 0;
+function addDays(n, k){ const t = new Date(dnToMs(n) + k * dayMs); return t.getUTCFullYear()*10000 + (t.getUTCMonth()+1)*100 + t.getUTCDate(); }
+async function renderBoard(){
+  const host = $('#boardList');
+  const sources = systems.map(s => ({ ...s, kind:'mine' }));
+  if ($('#boardPicks').checked) PICKS.forEach(p => sources.push({ ...p, kind:'pick' }));
+  if (!sources.length){ host.innerHTML = '<div class="empty">Save a system, or turn on Crab Picks, to fill the board.</div>'; return; }
+  host.innerHTML = '<div class="empty">Running your systems…</div>';
+  const end = addDays(TODAY, boardDays);
+  const items = new Map();
+  for (const sport of [...new Set(sources.map(s => s.sport))]){
+    await ensureSport(sport);
+    for (const s of sources.filter(x => x.sport === sport)){
+      const f = JSON.parse(JSON.stringify(s.f || {})); migrateFor(f, sport);
+      const res = evaluate({ sport, bet: s.bet, fade: !!s.fade, hideDup: !!s.hideDup, f });
+      const g = grade(res), eff = effBet(s.bet, !!s.fade);
+      for (const b of res.upcoming){
+        if (b.r.g.date > end) continue;
+        const p = pickFrom(b, sport, eff, []);
+        const id = pickId(p);
+        if (!items.has(id)) items.set(id, { p, srcs: [] });
+        items.get(id).srcs.push({ name: s.name, grade: g, kind: s.kind });
+      }
+    }
+  }
+  const list = [...items.values()];
+  list.forEach(it => { it.p.systems = it.srcs.map(s => s.name); });
+  // conflicts: picks on both sides of the same game and market
+  const fam = p => p.bet === 'over' || p.bet === 'under' ? 'tot' : 'side';
+  list.forEach(it => { it.conflict = list.some(o => o !== it && o.p.sport === it.p.sport && o.p.k === it.p.k && fam(o.p) === fam(it.p) && o.p.side !== it.p.side); });
+  if (!list.length){ host.innerHTML = `<div class="empty">No games fit your systems ${boardDays ? 'in this window' : 'today'}. Try Next 3 days, or check back after the next data update.</div>`; return; }
+  list.sort((a,b) => a.p.date - b.p.date || b.srcs.length - a.srcs.length);
+  let html = '', day = null;
+  for (const it of list){
+    if (it.p.date !== day){ day = it.p.date; html += `<div class="dayhead">${day === TODAY ? 'Today, ' : ''}${fmtShort(day)}</div>`; }
+    const i = regPick(it.p);
+    html += `<div class="board-item${it.conflict ? ' conflict' : ''}"><div><div class="pick">${esc(pickText(it.p))}</div><div class="meta">${SPORT_NAMES[it.p.sport]}: ${esc(it.p.away)} @ ${esc(it.p.home)}</div></div>
+      <div class="right"><div class="odds">${fmtOdds(it.p.odds)}</div>${logButton(i)}</div>
+      <div class="sys">${it.srcs.map(s => `<span class="chip${s.kind === 'pick' ? ' pick-chip' : ''}">${s.kind === 'pick' ? '🦀 ' : ''}${esc(s.name)}<span class="gr">${s.grade === 'x' ? '' : s.grade}</span></span>`).join('')}</div>
+      ${it.conflict ? '<div class="warn">Conflict: another system is on the other side of this game.</div>' : ''}</div>`;
+  }
+  html += '<div class="note">Prices are from the latest data update. Check your sportsbook before betting. Letter grades are each system’s overall grade.</div>';
+  host.innerHTML = html;
+}
+$('#openBoard').addEventListener('click', () => { $('#dlgBoard').showModal(); renderBoard(); });
+$('#boardRange').addEventListener('click', e => { const b = e.target.closest('[data-d]'); if (!b) return; boardDays = +b.dataset.d; $('#boardRange').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderBoard(); });
+$('#boardPicks').addEventListener('change', renderBoard);
 
 /* ---------- wiring ---------- */
 document.querySelectorAll('dialog [data-close]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
@@ -1341,6 +1723,7 @@ renderCats(); renderFilterTable();
   await store.init();
   try{ const idx = await store.get('index'); if (idx && idx.sports) data.index = idx; }catch(e){}
   await loadSystems();
+  await loadBets();
   $('#storeStatus').textContent = 'Systems saved in this browser';
   await setSport('NFL');
 })();
