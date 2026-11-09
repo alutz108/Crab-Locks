@@ -427,6 +427,33 @@ async function loadRemote(sport){
   const cb = cnt(base), ce = cnt(espn);
   const useEspn = new Set(Object.keys(ce).filter(s => { const e = ce[s], b = cb[s]; if (!b || !b.sp) return e.sp > 0; return e.sp >= 0.8 * b.sp && e.spO >= 0.8 * b.spO; }).map(Number));
   const games = base.filter(g => !useEspn.has(g.season)).concat(espn.filter(g => useEspn.has(g.season)));
+  // Sportsbook Review archive: fill opening lines (and anything missing) by matching date + final score.
+  if (ent.archive?.length){
+    const files = await Promise.all(ent.archive.map(s => fetchJSON(`data/archive/${sport}/${s}.json`, v).catch(() => null)));
+    const arch = []; files.forEach(f => { if (f) f.games.forEach(x => arch.push(normApi(x))); });
+    const key = (d, h, a) => d + '|' + h + '|' + a;
+    const idx = new Map(), dup = new Set();
+    games.forEach(g => { if (!isNum(g.hs)) return; const k = key(g.date, g.hs, g.as); if (idx.has(k)) dup.add(k); idx.set(k, g); });
+    const shift = (d, k) => { const t = new Date(dnToMs(d) + k * dayMs); return t.getUTCFullYear()*10000 + (t.getUTCMonth()+1)*100 + t.getUTCDate(); };
+    const flip = x => isNum(x) ? -x : x;
+    const have = new Set(games.map(g => g.season));
+    for (const a of arch){
+      let g = null, swapped = false;
+      for (const k of [0, -1, 1]){
+        const d = shift(a.date, k), k1 = key(d, a.hs, a.as), k2 = key(d, a.as, a.hs);
+        if (idx.has(k1) && !dup.has(k1)){ g = idx.get(k1); break; }
+        if (idx.has(k2) && !dup.has(k2)){ g = idx.get(k2); swapped = true; break; }
+      }
+      if (g){
+        const sp = swapped ? flip(a.sp) : a.sp, spO = swapped ? flip(a.spO) : a.spO;
+        if (!isNum(g.spO) && isNum(spO)) g.spO = spO;
+        if (!isNum(g.totO) && isNum(a.totO)) g.totO = a.totO;
+        if (!isNum(g.sp) && isNum(sp)) g.sp = sp;
+        if (!isNum(g.tot) && isNum(a.tot)) g.tot = a.tot;
+        if (!isNum(g.hml) && isNum(a.hml)){ g.hml = swapped ? a.aml : a.hml; g.aml = swapped ? a.hml : a.aml; }
+      } else if (!have.has(a.season)) games.push(a);
+    }
+  }
   // Coverage summary for the info line
   const fin = games.filter(g => isNum(g.hs));
   const seasons = [...new Set(games.map(g => g.season))].sort((a,b)=>a-b);
