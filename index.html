@@ -574,7 +574,7 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
 (function(){
 "use strict";
 const $ = s => document.querySelector(s);
-const FIELDS = ['season','week','post','date','home','away','hs','as','sp','spO','tot','totO','hml','aml','hso','aso','oo','uo','div','neu','hc','ac','hb','hm','temp','wind'];
+const FIELDS = ['season','week','post','date','home','away','hs','as','sp','spO','tot','totO','hml','aml','hso','aso','oo','uo','div','neu','hc','ac','hb','hm','temp','wind','ob','om'];
 const SPORT_NAMES = {NFL:'NFL',NCAAF:'College football',NBA:'NBA',NCAAB:'College basketball'};
 const isHoops = s => s === 'NBA' || s === 'NCAAB';
 const seasonLabel = (sport, s) => isHoops(sport) ? `${s}-${String(s+1).slice(-2)}` : String(s);
@@ -687,6 +687,20 @@ async function loadRemote(sport){
   const cb = cnt(base), ce = cnt(espn);
   const useEspn = new Set(Object.keys(ce).filter(s => { const e = ce[s], b = cb[s]; if (!b || !b.sp) return e.sp > 0; return e.sp >= 0.8 * b.sp && e.spO >= 0.8 * b.spO; }).map(Number));
   const games = base.filter(g => !useEspn.has(g.season)).concat(espn.filter(g => useEspn.has(g.season)));
+  // Public betting splits (Playbook API daily snapshots): match on date + home + away.
+  if (ent.splits){
+    try{
+      const sj = await fetchJSON(`data/splits/${sport}.json`, v);
+      const byKey = new Map(games.map(g => [g.date + '|' + g.home + '|' + g.away, g]));
+      const shift = (d, k) => { const t = new Date(dnToMs(d) + k * dayMs); return t.getUTCFullYear()*10000 + (t.getUTCMonth()+1)*100 + t.getUTCDate(); };
+      for (const [key, s] of Object.entries(sj.games || {})){
+        const [d, h, a] = key.split('|'); let g = null;
+        for (const k of [0, -1, 1]){ g = byKey.get(shift(+d, k) + '|' + h + '|' + a); if (g) break; }
+        if (!g) continue;
+        if (isNum(s.hb)) g.hb = s.hb; if (isNum(s.hm)) g.hm = s.hm; if (isNum(s.ob)) g.ob = s.ob; if (isNum(s.om)) g.om = s.om;
+      }
+    }catch(err){ /* splits are optional */ }
+  }
   // Sportsbook Review archive: fill opening lines (and anything missing) by matching date + final score.
   if (ent.archive?.length){
     const files = await Promise.all(ent.archive.map(s => fetchJSON(`data/archive/${sport}/${s}.json`, v).catch(() => null)));
@@ -898,7 +912,7 @@ function confOptions(rows, key){
   return [...m.entries()].map(([c, o]) => ({ v: c, label: c, sub: o.lo === o.hi ? seasonName(state.sport, o.lo).replace(' season','') : `${seasonName(state.sport, o.lo).replace(' season','')} to ${seasonName(state.sport, o.hi).replace(' season','')}` }))
     .sort((a,b) => a.label.localeCompare(b.label));
 }
-const POPULAR = ['season','venue','role','sp','team','tconf','prevW','mvdir','rest'];
+const POPULAR = ['season','venue','role','sp','team','tconf','prevW','mvdir','pubside','rest'];
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const CATS = [
@@ -917,8 +931,12 @@ const CATS = [
     { id:'totmv', label:'Total movement', type:'range', get:r=>r.totMv, step:0.5, need:r=>isNum(r.totMv), about:'Closing total minus opening total. Positive means the total went up.' },
   ]},
   { id:'pub', name:'Public betting', icon:'pub', filters:[
-    { id:'bets', label:'Team’s % of bets', type:'range', get:r=>r.bets, step:1, need:r=>isNum(r.bets), about:'Share of tickets on this team. Only available if you import a file with public betting percentages.' },
-    { id:'money', label:'Team’s % of money', type:'range', get:r=>r.money, step:1, need:r=>isNum(r.money), about:'Share of dollars on this team. Only available with imported betting-percentage data.' },
+    { id:'pubside', label:'Public side', type:'choice', opts:[['any','Any'],['pub','Public team (60%+ of bets)'],['heavy','Heavy public team (75%+ of bets)'],['contra','Contrarian (40% or less of bets)'],['sharp','Money ahead of bets by 10+']], test:(r,v)=> !isNum(r.bets) ? false : v==='pub' ? r.bets >= 60 : v==='heavy' ? r.bets >= 75 : v==='contra' ? r.bets <= 40 : isNum(r.money) && r.money - r.bets >= 10, need:r=>isNum(r.bets), about:'Quick public-betting spots. To fade the public, pick Public team and turn on Fade system, or pick Contrarian. “Money ahead of bets” means fewer, bigger bets are on this team, often read as sharp money. Data starts Nov 2026 from Playbook’s daily snapshot taken before games.' },
+    { id:'bets', label:'Team’s % of bets', type:'range', get:r=>r.bets, step:1, need:r=>isNum(r.bets), about:'Share of spread tickets on this team, from the last snapshot before the game. Collected daily since Nov 2026, so history is short at first.' },
+    { id:'money', label:'Team’s % of money', type:'range', get:r=>r.money, step:1, need:r=>isNum(r.money), about:'Share of spread dollars (handle) on this team. When money % is well above bets %, bigger bettors are on this side.' },
+    { id:'moneyGap', label:'Money % minus bets %', type:'range', get:r=> isNum(r.money) && isNum(r.bets) ? r.money - r.bets : null, step:1, need:r=>isNum(r.money) && isNum(r.bets), about:'How far the team’s share of money runs ahead of (positive) or behind (negative) its share of bets. +10 or more is a common “sharp side” signal.' },
+    { id:'obets', label:'Over’s % of bets', type:'range', get:r=>r.g.ob, step:1, need:r=>isNum(r.g.ob), about:'Share of total (over/under) tickets on the over. Use with the Under bet type to fade a public over.' },
+    { id:'omoney', label:'Over’s % of money', type:'range', get:r=>r.g.om, step:1, need:r=>isNum(r.g.om), about:'Share of total (over/under) dollars on the over.' },
   ]},
   { id:'time', name:'Time period', icon:'time', filters:[
     { id:'season', label:'Seasons', type:'multi', val:r=>r.g.season, options: seasonOptions, quick:true, noun:'seasons', about:'Pick the seasons to include. Use the quick picks for recent stretches; a system that only works in old seasons may not work now.' },
@@ -1781,6 +1799,12 @@ $('#betsBody').addEventListener('click', async e => {
 });
 
 /* ---------- Today's board ---------- */
+function publicTag(p){
+  const r = (data.rows[p.sport] || []).find(x => x.g.k === p.k && (p.bet === 'over' || p.bet === 'under' || x.team === p.side));
+  if (!r) return '';
+  if (p.bet === 'over' || p.bet === 'under'){ if (!isNum(r.g.ob)) return ''; const v = p.bet === 'over' ? r.g.ob : 100 - r.g.ob; return ` · ${Math.round(v)}% of bets on the ${p.bet}`; }
+  return isNum(r.bets) ? ` · ${Math.round(r.bets)}% of bets on ${esc(p.side)}` : '';
+}
 let boardDays = 0;
 function addDays(n, k){ const t = new Date(dnToMs(n) + k * dayMs); return t.getUTCFullYear()*10000 + (t.getUTCMonth()+1)*100 + t.getUTCDate(); }
 async function renderBoard(){
@@ -1817,7 +1841,7 @@ async function renderBoard(){
   for (const it of list){
     if (it.p.date !== day){ day = it.p.date; html += `<div class="dayhead">${day === TODAY ? 'Today, ' : ''}${fmtShort(day)}</div>`; }
     const i = regPick(it.p);
-    html += `<div class="board-item${it.conflict ? ' conflict' : ''}"><div ${gameAttrs(it.p.sport, it.p.k)}><div class="pick">${esc(pickText(it.p))}</div><div class="meta">${SPORT_NAMES[it.p.sport]}: ${esc(it.p.away)} @ ${esc(it.p.home)}</div></div>
+    html += `<div class="board-item${it.conflict ? ' conflict' : ''}"><div ${gameAttrs(it.p.sport, it.p.k)}><div class="pick">${esc(pickText(it.p))}</div><div class="meta">${SPORT_NAMES[it.p.sport]}: ${esc(it.p.away)} @ ${esc(it.p.home)}${publicTag(it.p)}</div></div>
       <div class="right"><div class="odds">${fmtOdds(it.p.odds)}</div>${logButton(i)}</div>
       <div class="sys">${it.srcs.map(s => `<span class="chip${s.kind === 'pick' ? ' pick-chip' : ''}">${s.kind === 'pick' ? '🦀 ' : ''}${esc(s.name)}<span class="gr">${s.grade === 'x' ? '' : s.grade}</span></span>`).join('')}</div>
       ${it.conflict ? '<div class="warn">Conflict: another system is on the other side of this game.</div>' : ''}</div>`;
@@ -1921,6 +1945,8 @@ const PHRASE = {
   b2b: v => ({ team:'on the second night of a back-to-back', opp:'facing a team on a back-to-back', both:'when both teams are on a back-to-back', none:'when neither team is on a back-to-back' })[v],
   temp: v => `in ${rw(v, '°F')} weather`, wind: v => `with wind of ${rw(v, ' mph')}`,
   bets: v => `getting ${rw(v, '%')} of bets`, money: v => `getting ${rw(v, '%')} of the money`,
+  pubside: v => ({ pub:'that the public is backing (60%+ of bets)', heavy:'that the public is piling on (75%+ of bets)', contra:'that the public is avoiding (40% or less of bets)', sharp:'where the money runs 10+ points ahead of the bets' })[v],
+  moneyGap: v => `with money minus bets of ${rw(v, ' points')}`, obets: v => `with ${rw(v, '%')} of bets on the over`, omoney: v => `with ${rw(v, '%')} of the money on the over`,
 };
 function plainEnglish(sys){
   const f = sys.f || {}, ids = activeIds(f);
@@ -1974,6 +2000,14 @@ async function openGame(sport, k){
       <div class="t">Total</div><div>${isNum(g.totO) ? g.totO : '–'}</div><div>${isNum(g.tot) ? g.tot : '–'}</div><div>${mv(g.totO, g.tot) || '–'}</div>
       <div class="t">Moneyline</div><div>–</div><div>${esc(g.away)} ${fmtOdds(A.ml)} / ${esc(g.home)} ${fmtOdds(H.ml)}</div><div>–</div></div>
     <div class="note" style="margin-top:-6px">A ▼ on a spread means the line moved toward that team (more money on them).</div>`;
+  if (isNum(g.hb) || isNum(g.ob)){
+    const pc = v => isNum(v) ? Math.round(v) + '%' : '–';
+    html += `<div class="gline" style="grid-template-columns:minmax(0,1.4fr) repeat(2,minmax(0,1fr))"><div class="h">Public betting</div><div class="h">Bets</div><div class="h">Money</div>
+      <div class="t">${esc(g.away)} spread</div><div>${pc(isNum(g.hb) ? 100 - g.hb : null)}</div><div>${pc(isNum(g.hm) ? 100 - g.hm : null)}</div>
+      <div class="t">${esc(g.home)} spread</div><div>${pc(g.hb)}</div><div>${pc(g.hm)}</div>
+      <div class="t">Over</div><div>${pc(g.ob)}</div><div>${pc(g.om)}</div></div>
+      <div class="note" style="margin-top:-6px">From Playbook’s last snapshot before the game.</div>`;
+  }
   const formTable = r => { const list = lastGames(sport, r.team, g.date);
     if (!list.length) return '<div class="muted">No earlier games.</div>';
     return `<table>${list.map(x => `<tr><td>${fmtShort(x.g.date).replace(/^\w+, /, '')}</td><td>${x.H ? 'vs' : '@'} ${esc(x.opp)}</td><td class="${x.mg > 0 ? 'W' : x.mg < 0 ? 'L' : 'P'}">${x.mg > 0 ? 'W' : x.mg < 0 ? 'L' : 'T'} ${x.pf}-${x.pa}</td><td>${isNum(x.atsM) ? `<span class="${x.atsM > 0 ? 'W' : x.atsM < 0 ? 'L' : 'P'}">${x.atsM > 0 ? 'Covered' : x.atsM < 0 ? 'No cover' : 'Push'}</span> ${fmtLine(x.sp)}` : ''}</td></tr>`).join('')}</table>`; };
