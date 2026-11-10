@@ -1,9 +1,11 @@
 {
- "updated": "2026-11-09T16:04:08+00:00",
+ "updated": "2026-11-10T03:43:03+00:00",
  "sports": {
   "NFL": {
    "base": true,
-   "api": []
+   "api": [],
+   "archive": [],
+   "splits": true
   },
   "NCAAF": {
    "base": true,
@@ -17,13 +19,17 @@
     2024,
     2025,
     2026
-   ]
+   ],
+   "archive": [],
+   "splits": false
   },
   "NBA": {
    "base": true,
    "api": [
     2026
-   ]
+   ],
+   "archive": [],
+   "splits": true
   },
   "NCAAB": {
    "base": false,
@@ -37,7 +43,9 @@
     2024,
     2025,
     2026
-   ]
+   ],
+   "archive": [],
+   "splits": false
   }
  },
  "notes": {}
