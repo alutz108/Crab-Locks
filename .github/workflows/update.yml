@@ -36,6 +36,7 @@ jobs:
         env:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          PLAYBOOK_API_KEY: ${{ secrets.PLAYBOOK_API_KEY }}
           MODE: ${{ github.event.inputs.mode || (github.event.schedule == '30 21 * * *' && 'odds' || 'full') }}
         run: |
           case "$MODE" in
