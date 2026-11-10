@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Crab Locks</title>
 <meta name="theme-color" content="#13233F">
-<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-title" content="Crab Locks">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1831,7 +1831,7 @@ $('#boardPicks').addEventListener('change', renderBoard);
 $('#boardExp').addEventListener('change', renderBoard);
 
 /* ---------- app version, refresh and update checks ---------- */
-const APP_VERSION = '2026.11.10-1';
+const APP_VERSION = '2026.11.10-2';
 function hardRefresh(){ location.replace(location.pathname + '?v=' + Date.now()); }
 function fmtUpdated(iso){
   const d = new Date(iso); if (isNaN(d)) return '';

@@ -10,7 +10,7 @@ self.addEventListener('fetch', e => {
   const p = u.pathname;
   if (req.mode === 'navigate' && u.searchParams.has('v')) { e.respondWith(networkFirst(req)); return; } // Refresh / Update buttons
   if (req.mode === 'navigate' || p.endsWith('/index.html') || p.endsWith('/data/index.json')) { e.respondWith(staleWhileRevalidate(req, e)); return; }
-  if (p.includes('/data/') || p.includes('/icons/') || p.endsWith('.webmanifest')) { e.respondWith(cacheFirst(req)); return; }
+  if (p.includes('/data/') || p.endsWith('.png') || p.endsWith('.webmanifest')) { e.respondWith(cacheFirst(req)); return; }
 });
 async function staleWhileRevalidate(req, e){
   const c = await caches.open(CACHE);
