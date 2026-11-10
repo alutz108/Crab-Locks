@@ -253,6 +253,13 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
 .pick-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .tbtn.pickbtn{border-color:var(--crab)}
 .m-show{display:none}
+#accountBtn.on{border-color:var(--win)}
+.acct-form{display:grid;gap:12px}
+.acct-err{color:var(--loss);font-size:14px;font-weight:600}
+.acct-ok{color:var(--win);font-size:14px;font-weight:600}
+.sync{display:flex;gap:8px;align-items:center;font-size:14px}
+.sync .dot{width:9px;height:9px;border-radius:50%;background:var(--win)}
+.sync .dot.off{background:var(--muted)}
 .upd{display:block;font-family:var(--fb);font-weight:400;font-size:11px;color:var(--navy-sub);letter-spacing:0;margin-top:-2px}
 @media (min-width:641px) and (max-width:1500px){.upd{display:none}}
 @media (min-width:641px) and (max-width:1400px){.mid-hide{display:none}.top select{max-width:150px}.brand{font-size:24px}}
@@ -303,8 +310,10 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
   dialog.view [data-close]{display:none}
   .toast{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
   .top-in{grid-template-columns:repeat(20,minmax(0,1fr))}
-  .brand{grid-column:1 / span 13}
-  #refreshBtn{grid-column:14 / span 7;grid-row:1;justify-content:center}
+  .brand{grid-column:1 / span 11}
+  #refreshBtn{grid-column:12 / span 3;grid-row:1;justify-content:center}
+  #accountBtn{grid-column:15 / span 6;grid-row:1;justify-content:center;overflow:hidden}
+  #accountLabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70px}
   #newSystem{grid-column:1 / span 10}
   #saveSystem{grid-column:11 / span 10}
 }
@@ -403,7 +412,8 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
 <header class="top">
   <div class="top-in">
     <div class="brand">🦀 Crab Locks <small id="storeStatus"></small><span class="upd" id="updLabel"></span></div>
-    <button class="tbtn iconbtn" id="refreshBtn" aria-label="Refresh" title="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg><span class="m-show">Refresh</span></button>
+    <button class="tbtn iconbtn" id="refreshBtn" aria-label="Refresh" title="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg></button>
+    <button class="tbtn iconbtn" id="accountBtn" aria-label="Account" title="Account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg><span id="accountLabel">Sign in</span></button>
     <select id="sport" aria-label="Sport">
       <option value="NFL">NFL</option>
       <option value="NCAAF">College football</option>
@@ -555,6 +565,11 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
   <div class="dlg-b" id="betsBody"></div>
 </dialog>
 
+<dialog id="dlgAccount" aria-labelledby="acctTitle" style="width:min(460px,calc(100vw - 20px))">
+  <div class="dlg-h"><h2 id="acctTitle">Your account</h2><button class="lbtn" data-close>Close</button></div>
+  <div class="dlg-b" id="acctBody"></div>
+</dialog>
+
 <dialog id="dlgGame" aria-labelledby="gameTitle" style="width:min(760px,calc(100vw - 20px))">
   <div class="dlg-h"><h2 id="gameTitle">Game</h2><button class="lbtn" data-close>Close</button></div>
   <div class="dlg-b" id="gameBody"></div>
@@ -570,6 +585,7 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
 
 <div class="toast" id="toast" role="status"></div>
 
+<script src="firebase-config.js"></script>
 <script>
 (function(){
 "use strict";
@@ -1552,7 +1568,7 @@ $('#impClear').addEventListener('click', async () => {
 /* ---------- systems ---------- */
 let systems = [];
 async function loadSystems(){ try{ const d = await store.get('systems'); systems = d && Array.isArray(d.list) ? d.list : []; }catch(e){ systems = []; } }
-async function persistSystems(){ await store.set('systems', { list: systems }); }
+async function persistSystems(){ await store.set('systems', { list: systems }); cloudPush('systems'); }
 function autoName(){ const s = plainEnglish({ sport: state.sport, bet: state.bet, fade: state.fade, f: state.f }).replace(/^Betting (against )?/, m => m.includes('against') ? 'Fade ' : '').replace(/\.$/, ''); const n = s.charAt(0).toUpperCase() + s.slice(1); return n.length > 70 ? n.slice(0, 67) + '…' : n; }
 function snapshot(){ const nm = state.name.trim(); if (!nm || nm === 'Untitled system'){ state.name = autoName(); $('#sysName').value = state.name; }
   return { id: state.id || 's' + Date.now().toString(36), name: state.name.trim() || 'Untitled system', sport: state.sport, bet: state.bet, juice: +state.juice || -110, f: JSON.parse(JSON.stringify(state.f)), theory: state.theory, fade: state.fade, hideDup: state.hideDup, saved: Date.now() }; }
@@ -1701,7 +1717,7 @@ document.addEventListener('click', e => { const b = e.target.closest('[data-log]
 /* ---------- bet log ---------- */
 let bets = [];
 async function loadBets(){ try{ const d = await store.get('bets'); bets = d && Array.isArray(d.list) ? d.list : []; }catch(e){ bets = []; } }
-async function persistBets(){ await store.set('bets', { list: bets }); }
+async function persistBets(){ await store.set('bets', { list: bets }); cloudPush('bets'); }
 let logging = null;
 function openLog(p){
   logging = p;
@@ -2037,6 +2053,101 @@ async function openGame(sport, k){
   host.innerHTML = hits.length ? hits.map(h => `<div class="betrow"><div><div class="pick">${esc(pickText(h.p))}</div><div class="meta">${h.s.kind === 'pick' ? '🦀 ' : ''}${esc(h.s.name)}${h.s.tier === 'exp' ? ' (experimental)' : ''} · grade ${h.grade === 'x' ? '–' : h.grade}</div></div><div class="res">${h.res ? `<span class="${h.res}">${h.res === 'W' ? 'Won' : h.res === 'L' ? 'Lost' : 'Push'}</span>` : fmtOdds(h.p.odds)}</div></div>`).join('') : '<div class="muted">None of your saved systems or Crab Picks are on this game.</div>';
 }
 
+/* ---------- accounts and cloud sync (Firebase) ---------- */
+const FB_VER = '10.12.2';
+const cloud = { on:false, user:null, db:null, auth:null, unsub:[], known:{ systems:new Map(), bets:new Map() }, last:null, err:'' };
+function loadScript(src){ return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('load ' + src)); document.head.appendChild(s); }); }
+async function initCloud(){
+  const cfg = window.CRAB_FIREBASE;
+  if (!cfg || !cfg.apiKey){ renderAccount(); return; }
+  try{
+    if (!window.firebase){
+      await loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-app-compat.js`);
+      await Promise.all([loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-auth-compat.js`), loadScript(`https://www.gstatic.com/firebasejs/${FB_VER}/firebase-firestore-compat.js`)]);
+    }
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    cloud.auth = firebase.auth(); cloud.db = firebase.firestore(); cloud.on = true;
+    try{ await cloud.db.enablePersistence({ synchronizeTabs:true }); }catch(e){}
+    cloud.auth.onAuthStateChanged(u => { cloud.user = u; cloud.unsub.forEach(f => f()); cloud.unsub = []; cloud.known.systems.clear(); cloud.known.bets.clear(); if (u) startSync(); renderAccount(); });
+  }catch(e){ cloud.err = 'Couldn’t reach the sign-in service. Check your connection.'; renderAccount(); }
+}
+const userCol = name => cloud.db.collection('users').doc(cloud.user.uid).collection(name);
+const plain = x => JSON.parse(JSON.stringify(x));
+async function startSync(){
+  const uid = cloud.user.uid;
+  const mergedKey = 'betlab:merged:' + uid; let firstTime = true;
+  try{ firstTime = !localStorage.getItem(mergedKey); }catch(e){}
+  for (const name of ['systems', 'bets']){
+    try{
+      // First sign-in on this device: add what this device has to the account.
+      // After that the account is the source of truth, so deletions on other devices stick.
+      const snap = firstTime ? await userCol(name).get() : { docs: [] };
+      const have = new Set(snap.docs.map(d => d.id));
+      const local = name === 'systems' ? systems : bets;
+      const missing = firstTime ? local.filter(x => x && x.id && !have.has(x.id)) : [];
+      for (let i = 0; i < missing.length; i += 400){ const b = cloud.db.batch(); missing.slice(i, i + 400).forEach(x => b.set(userCol(name).doc(x.id), plain(x))); await b.commit(); }
+      if (!cloud.user || cloud.user.uid !== uid) return;
+      cloud.unsub.push(userCol(name).onSnapshot(s => applyCloud(name, s.docs.map(d => d.data())), e => { cloud.err = 'Sync paused: ' + (e.message || e); renderAccount(); }));
+    }catch(e){ cloud.err = 'Sync problem: ' + (e.message || e); renderAccount(); return; }
+  }
+  try{ localStorage.setItem(mergedKey, '1'); }catch(e){}
+}
+function applyCloud(name, list){
+  cloud.known[name] = new Map(list.map(x => [x.id, JSON.stringify(x)]));
+  if (name === 'systems'){ systems = list.sort((a,b) => (b.saved || 0) - (a.saved || 0)); store.set('systems', { list: systems }).catch(() => {}); if ($('#dlgSystems').open) renderSystems(); }
+  else { bets = list.sort((a,b) => (b.placed || 0) - (a.placed || 0)); store.set('bets', { list: bets }).catch(() => {}); if ($('#dlgBets').open) renderBets(); }
+  cloud.last = Date.now(); cloud.err = ''; renderAccount();
+}
+async function cloudPush(name){
+  if (!cloud.user) return;
+  try{
+    const local = name === 'systems' ? systems : bets, known = cloud.known[name];
+    const ids = new Set(local.map(x => x.id)); const ops = [];
+    local.forEach(x => { if (x && x.id && known.get(x.id) !== JSON.stringify(plain(x))) ops.push(['set', x]); });
+    known.forEach((_, id) => { if (!ids.has(id)) ops.push(['del', id]); });
+    for (let i = 0; i < ops.length; i += 400){
+      const b = cloud.db.batch();
+      ops.slice(i, i + 400).forEach(([op, v]) => op === 'set' ? b.set(userCol(name).doc(v.id), plain(v)) : b.delete(userCol(name).doc(v)));
+      await b.commit();
+    }
+  }catch(e){ cloud.err = 'Couldn’t save to your account; it’s saved on this device and will retry. (' + (e.message || e) + ')'; renderAccount(); }
+}
+function friendlyAuthError(e){
+  const c = (e && e.code) || '';
+  return ({ 'auth/invalid-email':'That email address doesn’t look right.', 'auth/missing-password':'Enter a password.', 'auth/weak-password':'Use at least 6 characters for the password.',
+    'auth/email-already-in-use':'That email already has an account. Sign in instead.', 'auth/invalid-credential':'Email or password is wrong.', 'auth/wrong-password':'Email or password is wrong.',
+    'auth/user-not-found':'No account with that email yet. Tap Create account.', 'auth/too-many-requests':'Too many tries. Wait a minute and try again.', 'auth/network-request-failed':'No connection. Try again when you’re online.' })[c] || (e && e.message) || 'Something went wrong.';
+}
+function renderAccount(){
+  const lbl = $('#accountLabel'), btn = $('#accountBtn');
+  lbl.textContent = cloud.user ? (cloud.user.email || 'Account').split('@')[0] : 'Sign in';
+  btn.classList.toggle('on', !!cloud.user);
+  const host = $('#acctBody'); if (!host) return;
+  if (!window.CRAB_FIREBASE || !window.CRAB_FIREBASE.apiKey){ host.innerHTML = '<p>Accounts aren’t set up yet. Add your Firebase settings to <b>firebase-config.js</b> on GitHub.</p>'; return; }
+  if (!cloud.on){ host.innerHTML = `<p>${cloud.err || 'Connecting…'}</p>`; return; }
+  if (cloud.user){
+    host.innerHTML = `<p style="margin:0">Signed in as <b>${esc(cloud.user.email)}</b>.</p>
+      <div class="sync"><span class="dot${cloud.last ? '' : ' off'}"></span>${cloud.last ? `Synced: ${systems.length} system${systems.length === 1 ? '' : 's'} and ${bets.length} bet${bets.length === 1 ? '' : 's'}, last at ${new Date(cloud.last).toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' })}.` : 'Syncing…'}</div>
+      ${cloud.err ? `<div class="acct-err">${esc(cloud.err)}</div>` : ''}
+      <p class="muted" style="margin:0;font-size:14px">Sign in with the same email on your phone and computer and everything stays in sync. A copy also stays on this device, so it works offline.</p>
+      <div><button class="btn" id="acctOut">Sign out</button></div>`;
+    $('#acctOut').onclick = async () => { if (!confirm('Sign out? Your systems and bets stay in your account, and a copy stays on this device.')) return; await cloud.auth.signOut(); };
+    return;
+  }
+  host.innerHTML = `<p style="margin:0">Sign in to keep your systems and bet log in your account and sync them between your phone and computer.</p>
+    <div class="acct-form"><div class="field"><label for="acctEmail">Email</label><input type="text" id="acctEmail" autocomplete="email" inputmode="email" autocapitalize="off"></div>
+    <div class="field"><label for="acctPw">Password</label><input type="password" id="acctPw" autocomplete="current-password"></div>
+    <div class="acct-err" id="acctErr">${esc(cloud.err)}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="acctIn">Sign in</button><button class="btn" id="acctNew">Create account</button><button class="lbtn" id="acctReset">Forgot password?</button></div>
+    <p class="muted" style="margin:0;font-size:13px">Anything already on this device gets added to your account when you sign in.</p></div>`;
+  const val = () => [$('#acctEmail').value.trim(), $('#acctPw').value];
+  const run = async (fn, okMsg) => { $('#acctErr').textContent = ''; try{ await fn(); if (okMsg){ $('#acctErr').className = 'acct-ok'; $('#acctErr').textContent = okMsg; } }catch(e){ $('#acctErr').className = 'acct-err'; $('#acctErr').textContent = friendlyAuthError(e); } };
+  $('#acctIn').onclick = () => run(() => { const [e, p] = val(); return cloud.auth.signInWithEmailAndPassword(e, p); });
+  $('#acctNew').onclick = () => run(() => { const [e, p] = val(); return cloud.auth.createUserWithEmailAndPassword(e, p); });
+  $('#acctReset').onclick = () => run(() => { const [e] = val(); if (!e) throw { message:'Type your email above first.' }; return cloud.auth.sendPasswordResetEmail(e); }, 'Check your email for a reset link.');
+}
+$('#accountBtn').addEventListener('click', () => { renderAccount(); $('#dlgAccount').showModal(); });
+
 /* ---------- wiring ---------- */
 document.querySelectorAll('dialog [data-close]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
 $('#openImport').addEventListener('click', () => { $('#impSport').value = state.sport; $('#dlgImport').showModal(); });
@@ -2055,6 +2166,7 @@ renderCats(); renderFilterTable();
   try{ const idx = await store.get('index'); if (idx && idx.sports) data.index = idx; }catch(e){}
   await loadSystems();
   await loadBets();
+  initCloud();
   await setSport('NFL');
   showUpdLabel();
   openView('board');
