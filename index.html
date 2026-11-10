@@ -1135,9 +1135,20 @@ function describe(sys){
 }
 
 /* ---------- render: sidebar ---------- */
-function filterButton(d, sample){
-  const act = isActive(d, state.f[d.id]); const na = d.need && sample.length && !sample.some(d.need);
-  return `<li><button data-f="${d.id}" class="${act ? 'on' : ''}${na ? ' na' : ''}" title="${na ? 'No data for this sport yet' : ''}">${d.label}${act ? `<span class="hint">${esc(shortDetail(d))}</span>` : ''}</button></li>`;
+const needCache = new Map(); // sport -> Map(filterId -> { done, upcoming })
+function filterAvail(d){
+  const rows = data.rows[state.sport] || [];
+  if (!d.need || !rows.length) return null;
+  let m = needCache.get(state.sport);
+  if (!m || m.rows !== rows){ m = new Map(); m.rows = rows; needCache.set(state.sport, m); }
+  if (!m.has(d.id)){ let done = 0, up = 0; for (const r of rows){ if (d.need(r)){ if (r.done) done++; else up++; } } m.set(d.id, { done: done / 2, up: up / 2 }); }
+  return m.get(d.id);
+}
+function filterButton(d){
+  const act = isActive(d, state.f[d.id]); const av = filterAvail(d);
+  const na = av && !av.done && !av.up, upOnly = av && !av.done && av.up;
+  const tip = na ? 'No data for this sport yet' : upOnly ? `Only upcoming games have this so far (${Math.round(av.up)}); no finished games to test yet` : '';
+  return `<li><button data-f="${d.id}" class="${act ? 'on' : ''}${na ? ' na' : ''}" title="${tip}">${d.label}${act ? `<span class="hint">${esc(shortDetail(d))}</span>` : upOnly ? '<span class="hint">upcoming only</span>' : ''}</button></li>`;
 }
 function shortDetail(d){ const s = filterDetail(d, state.f[d.id]); return s.length > 18 ? s.slice(0, 17) + '…' : s; }
 function renderCats(){
@@ -1145,11 +1156,10 @@ function renderCats(){
   const openIds = new Set([...host.querySelectorAll('details[open]')].map(x => x.dataset.cat));
   const first = !host.querySelector('details');
   const rows = data.rows[state.sport] || [];
-  const sample = rows.length ? rows.filter((_,i) => i % Math.max(1, Math.floor(rows.length/600)) === 0) : [];
   const q = ($('#fq').value || '').trim().toLowerCase();
   if (q){
     const hits = ALLF.filter(d => (d.label + ' ' + d.cat.name + ' ' + (d.about || '')).toLowerCase().includes(q));
-    host.innerHTML = `<div class="sres"><ul style="list-style:none;margin:0;padding:0" class="cat">${hits.map(d => filterButton(d, sample)).join('') || '<li class="none">No filters match.</li>'}</ul></div>`;
+    host.innerHTML = `<div class="sres"><ul style="list-style:none;margin:0;padding:0" class="cat">${hits.map(d => filterButton(d)).join('') || '<li class="none">No filters match.</li>'}</ul></div>`;
     host.querySelectorAll('li button').forEach(b => b.style.paddingLeft = '28px');
     return;
   }
@@ -1157,7 +1167,7 @@ function renderCats(){
   host.innerHTML = [pop, ...CATS].map(c => {
     const on = c.filters.filter(d => isActive(d, state.f[d.id])).length;
     const open = first ? c.id === 'pop' : openIds.has(c.id);
-    return `<details class="cat${c.id === 'pop' ? ' pop' : ''}" data-cat="${c.id}"${open ? ' open' : ''}><summary>${ICONS[c.icon]}<span>${c.name}</span>${on && c.id !== 'pop' ? `<span class="cnt">${on}</span>` : ''}</summary><ul>${c.filters.map(d => filterButton(d, sample)).join('')}</ul></details>`;
+    return `<details class="cat${c.id === 'pop' ? ' pop' : ''}" data-cat="${c.id}"${open ? ' open' : ''}><summary>${ICONS[c.icon]}<span>${c.name}</span>${on && c.id !== 'pop' ? `<span class="cnt">${on}</span>` : ''}</summary><ul>${c.filters.map(d => filterButton(d)).join('')}</ul></details>`;
   }).join('');
 }
 $('#fq').addEventListener('input', () => renderCats());
@@ -1207,7 +1217,12 @@ function renderKPIs(res){
   }
   const n = res.W + res.L, be = res.be ? (res.be*100).toFixed(1) + '%' : '';
   let msg;
-  if (!res.n) msg = (data.rows[state.sport]?.length ? 'No graded games match these filters.' : 'No games loaded for this sport yet.');
+  const upOnly = activeIds(state.f).map(id => FBYID[id]).filter(d => { const av = filterAvail(d); return av && !av.done; });
+  if (!res.n && upOnly.length){
+    const fin = activeIds(state.f).map(id => FBYID[id]).map(filterAvail).filter(Boolean);
+    msg = `<b>No finished games to test yet.</b> ${upOnly.map(d => d.label).join(' and ')} ${upOnly.length > 1 ? 'have' : 'has'} only been collected since Nov 9, 2026, so only upcoming games have ${upOnly.length > 1 ? 'them' : 'it'} so far. Check <b>Upcoming matches</b> for games that fit; results fill in as those games finish.`;
+  }
+  else if (!res.n) msg = (data.rows[state.sport]?.length ? 'No graded games match these filters.' : 'No games loaded for this sport yet.');
   else if (n < 30) msg = `<b>Too few bets to grade.</b> ${n} decisions so far.`;
   else if (res.z >= 2.5) msg = `<b>Strong.</b> ${res.z.toFixed(2)} standard deviations above break-even (${be}). Check that it holds across seasons, not just one hot stretch.`;
   else if (res.z >= 1.5) msg = `<b>Promising.</b> ${res.z.toFixed(2)} standard deviations above break-even (${be}). Luck can do this, especially after trying lots of filters.`;
