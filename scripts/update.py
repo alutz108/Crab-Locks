@@ -970,8 +970,14 @@ def splits_plan(morning):
     """Which leagues to pull this run, to stay inside the free plan."""
     wd = TODAY.weekday()  # Mon=0 ... Sat=5, Sun=6
     plan = []
+    m = TODAY.month
     for sport in ("NFL", "NCAAF", "NBA", "NCAAB"):
-        if not games_today(sport): continue
+        if sport == "NCAAB":
+            # Lines for tonight's college games often aren't in our data yet, so go by the calendar.
+            if not (m in (11, 12, 1, 2, 3) or (m == 4 and TODAY.day <= 8)): continue
+        elif sport == "NCAAF":
+            if not (m in (9, 10, 11, 12) or (m == 8 and TODAY.day >= 20) or (m == 1 and TODAY.day <= 20)) or wd in (0, 6): continue
+        elif not games_today(sport): continue
         weekend_football = sport in ("NFL", "NCAAF") and wd in (5, 6)
         if morning == weekend_football:  # weekend football early; everything else in the afternoon
             plan.append(sport)
