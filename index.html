@@ -511,7 +511,7 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
     <div class="field"><label for="impSport">Sport for this file</label>
       <select id="impSport" class="sel"><option value="NFL">NFL</option><option value="NCAAF">College football</option><option value="NBA">NBA</option><option value="NCAAB">College basketball</option></select>
     </div>
-    <div class="field"><label for="impFile">CSV file</label><input type="file" id="impFile" accept=".csv,text/csv"></div>
+    <div class="field"><label for="impFile">File (CSV of games, or a JSON public betting export)</label><input type="file" id="impFile" accept=".csv,text/csv,.json,application/json"></div>
     <div id="impMap"></div>
   </div>
   <div class="dlg-f">
@@ -675,6 +675,20 @@ async function fetchJSON(path, bust){
   if (!r.ok) throw new Error(path + ' ' + r.status);
   return r.json();
 }
+const NFL_FULL = {'Arizona Cardinals':'ARI','Atlanta Falcons':'ATL','Baltimore Ravens':'BAL','Buffalo Bills':'BUF','Carolina Panthers':'CAR','Chicago Bears':'CHI','Cincinnati Bengals':'CIN','Cleveland Browns':'CLE','Dallas Cowboys':'DAL','Denver Broncos':'DEN','Detroit Lions':'DET','Green Bay Packers':'GB','Houston Texans':'HOU','Indianapolis Colts':'IND','Jacksonville Jaguars':'JAX','Kansas City Chiefs':'KC','Las Vegas Raiders':'LV','Los Angeles Chargers':'LAC','Los Angeles Rams':'LA','Miami Dolphins':'MIA','Minnesota Vikings':'MIN','New England Patriots':'NE','New Orleans Saints':'NO','New York Giants':'NYG','New York Jets':'NYJ','Philadelphia Eagles':'PHI','Pittsburgh Steelers':'PIT','San Francisco 49ers':'SF','Seattle Seahawks':'SEA','Tampa Bay Buccaneers':'TB','Tennessee Titans':'TEN','Washington Commanders':'WAS'};
+function matchTeamName(sport, full, names){
+  if (!full) return null;
+  if (names.includes(full)) return full;
+  if (sport === 'NFL') return NFL_FULL[full] || null;
+  const low = full.toLowerCase(); let best = null;
+  for (const n of names){
+    const l = n.toLowerCase();
+    const ok = sport === 'NBA' ? (low.endsWith(' ' + l) || low === l) : (low.startsWith(l + ' ') || low === l);
+    if (ok && (!best || n.length > best.length)) best = n;
+  }
+  if (sport === 'NBA' && low === 'la clippers') return names.includes('Clippers') ? 'Clippers' : best;
+  return best;
+}
 function normApi(x, sport){
   const g = {}; FIELDS.forEach(f => g[f] = null);
   for (const f of FIELDS) if (x[f] !== undefined) g[f] = x[f];
@@ -703,6 +717,23 @@ async function loadRemote(sport){
   const cb = cnt(base), ce = cnt(espn);
   const useEspn = new Set(Object.keys(ce).filter(s => { const e = ce[s], b = cb[s]; if (!b || !b.sp) return e.sp > 0; return e.sp >= 0.8 * b.sp && e.spO >= 0.8 * b.spO; }).map(Number));
   const games = base.filter(g => !useEspn.has(g.season)).concat(espn.filter(g => useEspn.has(g.season)));
+  // Public betting numbers imported from a file (kept in this browser only).
+  try{
+    const loc = await store.get('pubsplits-' + sport);
+    if (loc && loc.games){
+      const names = [...new Set(games.flatMap(g => [g.home, g.away]))];
+      const nm = full => matchTeamName(sport, full, names);
+      const byKey = new Map(games.map(g => [g.date + '|' + g.home + '|' + g.away, g]));
+      const sh = (d, k) => { const t = new Date(dnToMs(d) + k * dayMs); return t.getUTCFullYear()*10000 + (t.getUTCMonth()+1)*100 + t.getUTCDate(); };
+      const cache = new Map(); const look = n => { if (!cache.has(n)) cache.set(n, nm(n)); return cache.get(n); };
+      for (const [key, s] of Object.entries(loc.games)){
+        const [d, hf, af] = key.split('|'); const h = look(hf), a = look(af); if (!h || !a) continue;
+        let g = null; for (const k of [0, -1, 1]){ g = byKey.get(sh(+d, k) + '|' + h + '|' + a); if (g) break; }
+        if (!g) continue;
+        if (isNum(s.hb)) g.hb = s.hb; if (isNum(s.hm)) g.hm = s.hm; if (isNum(s.ob)) g.ob = s.ob; if (isNum(s.om)) g.om = s.om;
+      }
+    }
+  }catch(err){}
   // Public betting splits (Playbook API daily snapshots): match on date + home + away.
   if (ent.splits){
     try{
@@ -1532,8 +1563,35 @@ function rowToGame(row){
   g.k = gameKey(g);
   return g;
 }
-$('#impFile').addEventListener('change', e => {
+const AN_SPORT = { nfl:'NFL', ncaaf:'NCAAF', nba:'NBA', ncaab:'NCAAB' };
+let anImport = null;
+function etDate(iso){ const d = new Date(iso); if (isNaN(d)) return null; const p = new Intl.DateTimeFormat('en-US', { timeZone:'America/New_York', year:'numeric', month:'2-digit', day:'2-digit' }).formatToParts(d); const g = k => p.find(x => x.type === k).value; return +(g('year') + g('month') + g('day')); }
+function parseActionNetwork(list){
+  const by = {};
+  for (const x of list){
+    const sport = AN_SPORT[String(x.league || '').toLowerCase()]; if (!sport) continue;
+    const date = etDate(x.start_time); if (!date) continue;
+    const rec = { date, home: x.home_team, away: x.away_team, hb: x.spread_home_tickets_pct, hm: x.spread_home_money_pct, ob: x.over_tickets_pct, om: x.over_money_pct, done: x.home_score != null && x.away_score != null };
+    if (![rec.hb, rec.hm, rec.ob, rec.om].some(isNum)) continue;
+    (by[sport] ||= []).push(rec);
+  }
+  return by;
+}
+$('#impFile').addEventListener('change', async e => {
   const file = e.target.files[0]; if (!file) return;
+  if (/\.json$/i.test(file.name)){
+    try{
+      const list = JSON.parse(await file.text());
+      if (!Array.isArray(list) || !list.length || !('spread_home_tickets_pct' in list[0] || 'over_tickets_pct' in list[0])) throw new Error('not AN');
+      const by = parseActionNetwork(list); imp = null; renderMap();
+      const n = Object.values(by).reduce((a, l) => a + l.length, 0);
+      anImport = by;
+      $('#impMap').innerHTML = `<div class="about"><h4>Public betting file</h4><p>${n.toLocaleString()} games with public betting numbers: ${Object.entries(by).map(([s, l]) => `${SPORT_NAMES[s]} ${l.length.toLocaleString()} (${l.filter(r => r.done).length.toLocaleString()} finished)`).join(', ') || 'none'}. They’ll be matched to the games already in Crab Locks and saved privately: in this browser, and in your account if you’re signed in, so your other devices get them too. Nothing goes to GitHub.</p></div>`;
+      $('#impGo').disabled = !n; $('#impGo').textContent = 'Import public betting numbers';
+    }catch(err){ anImport = null; toast('That JSON file isn’t a public betting export Crab Locks can read.'); }
+    return;
+  }
+  anImport = null; $('#impGo').textContent = 'Import games';
   if (!window.Papa){ toast('The CSV reader didn’t load. Check your connection and reopen the page.'); return; }
   Papa.parse(file, { header:true, skipEmptyLines:true, complete: out => {
     const headers = out.meta.fields || [];
@@ -1546,6 +1604,26 @@ $('#impFile').addEventListener('change', e => {
 });
 $('#impSport').addEventListener('change', e => { if (imp) imp.sport = e.target.value; });
 $('#impGo').addEventListener('click', async () => {
+  if (anImport){
+    const btn = $('#impGo'); btn.disabled = true; btn.textContent = 'Importing…';
+    try{
+      let total = 0, matched = 0;
+      for (const [sport, list] of Object.entries(anImport)){
+        const cur = (await store.get('pubsplits-' + sport)) || { games: {} };
+        list.forEach(r => { cur.games[r.date + '|' + r.home + '|' + r.away] = { hb: r.hb, hm: r.hm, ob: r.ob, om: r.om }; });
+        await store.set('pubsplits-' + sport, cur); total += list.length;
+        if (typeof cloudPushSplits === 'function') cloudPushSplits(sport, cur);
+        delete data.rows[sport]; delete remote.games[sport];
+        await ensureSport(sport);
+        matched += (data.rows[sport] || []).filter(r => r.H && isNum(r.g.hb)).length;
+      }
+      anImport = null; $('#impFile').value = ''; $('#impMap').innerHTML = ''; $('#dlgImport').close();
+      await setSport(state.sport);
+      toast(`Imported public betting numbers for ${total.toLocaleString()} games.`);
+    }catch(err){ toast('Import didn’t finish. Try again.'); }
+    finally{ $('#impGo').textContent = 'Import games'; $('#impGo').disabled = true; }
+    return;
+  }
   const btn = $('#impGo'); btn.disabled = true; btn.textContent = 'Importing…';
   try{
     const sport = $('#impSport').value; imp.sport = sport;
@@ -2166,6 +2244,38 @@ async function startSync(){
     }catch(e){ cloud.err = 'Sync problem: ' + (e.message || e); renderAccount(); return; }
   }
   try{ localStorage.setItem(mergedKey, '1'); }catch(e){}
+  cloudPullSplits();
+}
+/* Imported public betting numbers: private to the account, split into docs under 1 MB. */
+async function cloudPushSplits(sport, cur){
+  if (!cloud.user) return;
+  try{
+    const entries = Object.entries(cur.games || {});
+    const per = 8000, parts = Math.max(1, Math.ceil(entries.length / per));
+    const col = userCol('pubsplits');
+    for (let i = 0; i < parts; i++) await col.doc(`${sport}-${i}`).set({ sport, part: i, parts, games: Object.fromEntries(entries.slice(i * per, (i + 1) * per)) });
+  }catch(e){ cloud.err = 'Couldn’t save imported public betting numbers to your account. They’re still on this device.'; renderAccount(); }
+}
+async function cloudPullSplits(){
+  if (!cloud.user) return;
+  try{
+    const snap = await userCol('pubsplits').get();
+    const by = {};
+    snap.docs.forEach(d => { const x = d.data(); (by[x.sport] ||= {}); Object.assign(by[x.sport], x.games || {}); });
+    let changed = false;
+    for (const [sport, games] of Object.entries(by)){
+      const cur = (await store.get('pubsplits-' + sport)) || { games: {} };
+      const before = Object.keys(cur.games).length;
+      Object.assign(cur.games, games);
+      if (Object.keys(cur.games).length !== before){ await store.set('pubsplits-' + sport, cur); delete data.rows[sport]; delete remote.games[sport]; changed = true; }
+    }
+    // anything only on this device goes up to the account
+    for (const sport of ['NFL','NCAAF','NBA','NCAAB']){
+      const cur = await store.get('pubsplits-' + sport);
+      if (cur && Object.keys(cur.games || {}).length > Object.keys(by[sport] || {}).length) await cloudPushSplits(sport, cur);
+    }
+    if (changed){ await setSport(state.sport); toast('Loaded your imported public betting numbers from your account.'); }
+  }catch(e){ /* optional */ }
 }
 function applyCloud(name, list){
   cloud.known[name] = new Map(list.map(x => [x.id, JSON.stringify(x)]));
