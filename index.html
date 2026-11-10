@@ -1742,16 +1742,66 @@ $('#logGo').addEventListener('click', async () => {
   catch(e){ bets.shift(); toast('Couldn’t save the bet. Try again.'); }
 });
 function gradeBet(b){
-  const rows = data.rows[b.sport]; if (!rows) return null;
+  const rows = data.rows[b.sport];
   const tot = b.bet === 'over' || b.bet === 'under';
-  const r = rows.find(x => x.g.k === b.k && (tot || x.team === b.side));
-  if (!r || !r.done) return { res: null };
+  const r = rows ? rows.find(x => x.g.k === b.k && (tot || x.team === b.side)) : null;
+  let hs, as;
+  if (r && r.done){ hs = r.g.hs; as = r.g.as; }
+  else if (b.final && isNum(b.final.hs) && isNum(b.final.as)){ hs = b.final.hs; as = b.final.as; }
+  else return rows ? { res: null } : null;
+  const mg = b.side === b.home ? hs - as : as - hs;
   let res;
-  if (b.bet === 'spread'){ const m = r.mg + b.line; res = m > 0 ? 'W' : m < 0 ? 'L' : 'P'; }
-  else if (b.bet === 'ml'){ res = r.mg > 0 ? 'W' : r.mg < 0 ? 'L' : 'P'; }
-  else { const pts = r.pf + r.pa; res = pts === b.line ? 'P' : ((pts > b.line) === (b.bet === 'over') ? 'W' : 'L'); }
-  return { res, won: b.stake * profit(res, b.odds), final: `${r.g.away} ${r.g.as}, ${r.g.home} ${r.g.hs}` };
+  if (b.bet === 'spread'){ const m = mg + b.line; res = m > 0 ? 'W' : m < 0 ? 'L' : 'P'; }
+  else if (b.bet === 'ml'){ res = mg > 0 ? 'W' : mg < 0 ? 'L' : 'P'; }
+  else { const pts = hs + as; res = pts === b.line ? 'P' : ((pts > b.line) === (b.bet === 'over') ? 'W' : 'L'); }
+  return { res, won: b.stake * profit(res, b.odds), final: `${b.away} ${as}, ${b.home} ${hs}`, live: !(r && r.done) };
 }
+
+/* ---------- live finals from ESPN for pending bets ---------- */
+const ESPN_PATH = { NFL:'football/nfl', NCAAF:'football/college-football', NBA:'basketball/nba', NCAAB:'basketball/mens-college-basketball' };
+const ESPN_GROUP = { NCAAF:'&groups=80', NCAAB:'&groups=50' };
+const NFL_TO_ESPN = { LA:'LAR', WAS:'WSH' };
+const normT = s => String(s || '').toLowerCase().replace(/&/g, 'and').replace(/\bst\.?\b/g, 'state').replace(/[^a-z0-9]/g, '');
+function espnMatches(sport, ours, team){
+  if (!team) return false;
+  if (sport === 'NFL') return (NFL_TO_ESPN[ours] || ours) === team.abbreviation;
+  if (sport === 'NBA') return normT(ours) === normT(team.shortDisplayName) || normT(team.displayName).endsWith(normT(ours));
+  const o = normT(ours);
+  return o === normT(team.location) || o === normT(team.shortDisplayName) || normT(team.displayName).startsWith(o) && normT(team.displayName).length - o.length > 3 && !/^(state|tech|am|christian)/.test(normT(team.displayName).slice(o.length));
+}
+const liveChecked = new Map();
+async function fetchLiveFinals(){
+  const pend = bets.filter(b => !b.final && b.date <= TODAY && ESPN_PATH[b.sport] && !(gradeBet(b) || {}).res);
+  if (!pend.length) return 0;
+  let changed = 0;
+  const groups = new Map(); pend.forEach(b => { const k = b.sport + '|' + b.date; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(b); });
+  for (const [k, list] of groups){
+    if (Date.now() - (liveChecked.get(k) || 0) < 5 * 60 * 1000) continue;
+    liveChecked.set(k, Date.now());
+    const [sport, date] = k.split('|');
+    try{
+      const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${ESPN_PATH[sport]}/scoreboard?dates=${date}&limit=1000${ESPN_GROUP[sport] || ''}`);
+      if (!r.ok) continue;
+      const js = await r.json();
+      for (const ev of js.events || []){
+        const comp = (ev.competitions || [])[0] || {}; if (!(comp.status || ev.status || {}).type?.completed) continue;
+        const h = (comp.competitors || []).find(c => c.homeAway === 'home'), a = (comp.competitors || []).find(c => c.homeAway === 'away');
+        if (!h || !a) continue;
+        for (const b of list){
+          if (b.final) continue;
+          let hs, as;
+          if (espnMatches(sport, b.home, h.team) && espnMatches(sport, b.away, a.team)){ hs = +h.score; as = +a.score; }
+          else if (espnMatches(sport, b.home, a.team) && espnMatches(sport, b.away, h.team)){ hs = +a.score; as = +h.score; } // neutral-site listing flipped
+          else continue;
+          if (isNum(hs) && isNum(as)){ b.final = { hs, as, src:'ESPN', at: Date.now() }; changed++; }
+        }
+      }
+    }catch(e){ /* offline or blocked: the morning update will grade it */ }
+  }
+  if (changed){ try{ await persistBets(); }catch(e){} }
+  return changed;
+}
+async function liveGrade(){ const n = await fetchLiveFinals(); if (n){ if ($('#dlgBets').open) renderBets(); toast(`${n} bet${n === 1 ? '' : 's'} graded from final scores.`); } }
 let betsFilter = 'all';
 function bankChart(done){
   const list = done.slice().sort((a,b) => a.b.date - b.b.date || a.b.placed - b.b.placed);
@@ -1771,6 +1821,7 @@ function bankChart(done){
 }
 async function renderBets(){
   const host = $('#betsBody');
+  setTimeout(liveGrade, 50);
   if (!bets.length){ host.innerHTML = '<div class="empty">No bets logged yet. Tap <b>Log bet</b> on Today’s board, under Upcoming matches, or on any game.</div>'; return; }
   host.innerHTML = '<div class="empty">Grading…</div>';
   for (const s of [...new Set(bets.map(b => b.sport))]) await ensureSport(s);
@@ -1793,7 +1844,7 @@ async function renderBets(){
   const n = { all: graded.length, pending: pend.length, won: done.filter(x => x.g.res === 'W').length, lost: done.filter(x => x.g.res === 'L').length };
   html += `<div class="ptabs" id="betsFilter">${[['all','All'],['pending','Pending'],['won','Won'],['lost','Lost']].map(([k, l]) => `<button data-bf="${k}" aria-pressed="${betsFilter === k}">${l} (${n[k]})</button>`).join('')}</div>`;
   const row = x => { const b = x.b, g = x.g;
-    const right = g && g.res ? `<div class="res"><span class="${g.res}">${g.res === 'W' ? 'Win' : g.res === 'L' ? 'Loss' : 'Push'}</span> <b class="${g.won > 0 ? 'W' : g.won < 0 ? 'L' : ''}">${usd(g.won)}</b></div>` : `<div class="res"><span class="badge-p">${b.date < TODAY ? 'Waiting for score' : 'Pending'}</span></div>`;
+    const right = g && g.res ? `<div class="res"><span class="${g.res}">${g.res === 'W' ? 'Win' : g.res === 'L' ? 'Loss' : 'Push'}</span> <b class="${g.won > 0 ? 'W' : g.won < 0 ? 'L' : ''}">${usd(g.won)}</b></div>` : `<div class="res"><span class="badge-p">${b.date < TODAY ? 'Waiting for score' : b.date === TODAY ? 'Tonight' : 'Pending'}</span></div>`;
     return `<div class="betrow"><div ${gameAttrs(b.sport, b.k)}><div class="pick">${esc(pickText(b))} <span class="muted" style="font-weight:400">${fmtOdds(b.odds)}, $${b.stake}</span></div><div class="meta">${SPORT_NAMES[b.sport]}: ${esc(b.away)} @ ${esc(b.home)}, ${fmtShort(b.date)}${g && g.final ? ' · Final: ' + esc(g.final) : ''}${b.systems.length ? ' · ' + esc(b.systems.join(', ')) : ''}</div></div>${right}<button class="lbtn del" data-delbet="${b.id}">Delete</button></div>`; };
   const pick = betsFilter === 'pending' ? pend : betsFilter === 'won' ? done.filter(x => x.g.res === 'W') : betsFilter === 'lost' ? done.filter(x => x.g.res === 'L') : null;
   if (pick) html += pick.length ? pick.sort((a,b) => b.b.date - a.b.date).map(row).join('') : '<div class="empty">Nothing here yet.</div>';
@@ -1887,6 +1938,15 @@ $('#updGo').addEventListener('click', hardRefresh);
 $('#updX').addEventListener('click', () => { $('#updBanner').hidden = true; });
 $('#refreshBtn').addEventListener('click', hardRefresh);
 let checking = false;
+async function reloadData(freshIndex){
+  // New daily data arrived: reload it in place, no tap needed.
+  remote.index = freshIndex; Object.keys(remote.games).forEach(k => delete remote.games[k]); Object.keys(data.rows).forEach(k => delete data.rows[k]);
+  await setSport(state.sport);
+  showUpdLabel();
+  if (curView !== 'build' && VIEWS[curView]) VIEWS[curView][1]();
+  toast(`Updated with the ${fmtUpdated(freshIndex.updated)} data.`);
+  liveGrade();
+}
 async function checkUpdates(){
   if (checking) return; checking = true;
   try{
@@ -1895,11 +1955,11 @@ async function checkUpdates(){
   }catch(e){}
   try{
     const r = await fetch('data/index.json?check=' + Date.now(), { cache:'no-store' });
-    if (r.ok){ const j = await r.json(); if (remote.index && j.updated && j.updated !== remote.index.updated) showBanner(`New data from ${fmtUpdated(j.updated)} is ready.`); }
+    if (r.ok){ const j = await r.json(); if (remote.index && j.updated && j.updated !== remote.index.updated) await reloadData(j); }
   }catch(e){}
   finally{ checking = false; }
 }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdates(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible'){ checkUpdates(); liveGrade(); } });
 setInterval(checkUpdates, 15 * 60 * 1000);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
@@ -2167,6 +2227,7 @@ renderCats(); renderFilterTable();
   await loadSystems();
   await loadBets();
   initCloud();
+  setTimeout(liveGrade, 6000);
   await setSport('NFL');
   showUpdLabel();
   openView('board');
