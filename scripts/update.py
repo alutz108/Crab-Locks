@@ -33,6 +33,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data")
 CFBD_KEY = os.environ.get("CFBD_API_KEY", "").strip()
 ODDS_KEY = os.environ.get("ODDS_API_KEY", "").strip()
+PLAYBOOK_KEY = os.environ.get("PLAYBOOK_API_KEY", "").strip()
 NOW = datetime.now(timezone.utc)
 TODAY = NOW.astimezone(ET).date()
 LOG = []
@@ -874,11 +875,114 @@ def import_sbr_archive(sports, state, test=False):
                                                     "updated": NOW.isoformat(timespec="seconds"), "games": games})
             done.setdefault(sport, {})[str(start)] = len(games)
 
+# ------------------------------------------------------------------ public betting splits (Playbook API)
+# Free plan: 500 units a month, 5 per call. Each call returns every upcoming game in one league,
+# so we pull each league once on days it plays, as close to game time as the schedule allows.
+# Snapshots for a game are overwritten until it starts, so what's kept is the last pregame read.
+PB_LEAGUE = {"NFL": ["nfl"], "NBA": ["nba"], "NCAAF": ["ncaaf", "cfb"], "NCAAB": ["ncaab", "cbb"]}
+PB_SPORTKEY = {"NFL": "americanfootball_nfl", "NBA": "basketball_nba", "NCAAF": "americanfootball_ncaaf", "NCAAB": "basketball_ncaab"}
+STATS["pb_left"] = None
+
+def games_today(sport):
+    """Our own list of today's games for a sport: (home, away) names as used in the app's data."""
+    today = int(TODAY.strftime("%Y%m%d")); out = []
+    if sport in ("NFL", "NBA"):
+        for e in load(f"odds/{sport}.json", {"events": {}})["events"].values():
+            if e.get("date") == today: out.append((e["home"], e["away"]))
+    else:
+        for g in load(f"api/{sport}/{season_of(sport, TODAY)}.json", {"games": []})["games"]:
+            if g.get("date") == today and g.get("hs") is None: out.append((g["home"], g["away"]))
+    return out
+
+def pb_fetch(sport):
+    known = load("splits/_params.json", {})
+    tries = ([known[sport]] if sport in known else []) + [{"league": l} for l in PB_LEAGUE[sport]] + [{"sportKey": PB_SPORTKEY[sport]}]
+    last = None
+    for q in tries:
+        try:
+            js = http_json("https://api.playbook-api.com/v1/splits?" + urllib.parse.urlencode({**q, "api_key": PLAYBOOK_KEY}))
+        except RuntimeError as e:
+            last = e
+            if "429" in str(e) or "401" in str(e) or "403" in str(e):
+                raise
+            continue
+        if isinstance(js, dict):
+            STATS["pb_left"] = js.get("requestsRemaining", STATS["pb_left"])
+            sk = js.get("sportKey") or ((js.get("data") or [{}])[0].get("sportKey") if js.get("data") else None)
+            if js.get("data") is not None and sk in (None, PB_SPORTKEY[sport]):
+                if known.get(sport) != q:
+                    known[sport] = q; save("splits/_params.json", known)
+                return js.get("data") or []
+    if last: raise last
+    return []
+
+def pb_name(sport, full, candidates):
+    """Map a Playbook team name to the name our data uses for that sport."""
+    if sport == "NFL": return NFL_ABBR.get(full, full)
+    if sport == "NBA": return NBA_SHORT.get(full, full)
+    # college: our names are school names ("Alabama"); Playbook's add mascots ("Alabama Crimson Tide").
+    best = None
+    for c in candidates:
+        if full == c or full.startswith(c + " "):
+            if best is None or len(c) > len(best): best = c
+    return best
+
+def pull_splits(sport, test=False):
+    if not PLAYBOOK_KEY:
+        say(f"  {sport} public betting: no PLAYBOOK_API_KEY, skipping"); return
+    if STATS["pb_left"] is not None and STATS["pb_left"] < 15:
+        say(f"  {sport} public betting: only {STATS['pb_left']} Playbook units left this month; skipping to stay under the free limit"); return
+    rows = pb_fetch(sport)
+    store = load(f"splits/{sport}.json", {"games": {}})
+    ours = games_today(sport) if sport in ("NCAAF", "NCAAB") else []
+    names = sorted({n for pair in ours for n in pair} | {k.split("|")[1] for k in store["games"]} | {k.split("|")[2] for k in store["games"]})
+    if sport in ("NCAAF", "NCAAB"):
+        for g in load(f"api/{sport}/{season_of(sport, TODAY)}.json", {"games": []})["games"]:
+            names.append(g["home"]); names.append(g["away"])
+        names = sorted(set(names), key=len, reverse=True)
+    saved = unmatched = 0
+    for x in rows:
+        try:
+            start = datetime.fromisoformat(str(x.get("startTime")).replace("Z", "+00:00"))
+        except Exception:
+            continue
+        if start <= NOW:
+            continue  # game started: keep the last pregame snapshot we already have
+        h, a = pb_name(sport, x.get("homeTeamName", ""), names), pb_name(sport, x.get("awayTeamName", ""), names)
+        if not h or not a:
+            unmatched += 1; continue
+        sp = (x.get("splits") or {}); s_, m_, t_ = sp.get("spread") or {}, sp.get("moneyline") or {}, sp.get("total") or {}
+        rec = {"hb": _dig(s_, "bets", "homePercent"), "hm": _dig(s_, "money", "homePercent"),
+               "mlb": _dig(m_, "bets", "homePercent"), "mlm": _dig(m_, "money", "homePercent"),
+               "ob": _dig(t_, "bets", "overPercent"), "om": _dig(t_, "money", "overPercent"),
+               "books": _dig(s_, "source", "booksUsed"), "at": NOW.isoformat(timespec="minutes")}
+        if all(rec[k] is None for k in ("hb", "hm", "ob", "om")):
+            continue
+        key = f"{ymd(x.get('startTime'))}|{h}|{a}"
+        if test and saved < 2:
+            say(f"  sample {sport}: {x.get('awayTeamName')} @ {x.get('homeTeamName')} -> {a} @ {h}: {json.dumps(rec)}")
+        store["games"][key] = rec; saved += 1
+    say(f"  {sport} public betting: {len(rows)} games from Playbook, {saved} saved, {unmatched} couldn’t be matched to our games. Units left: {STATS['pb_left']}")
+    if not test:
+        save(f"splits/{sport}.json", store)
+
+def splits_plan(morning):
+    """Which leagues to pull this run, to stay inside the free plan."""
+    wd = TODAY.weekday()  # Mon=0 ... Sat=5, Sun=6
+    plan = []
+    for sport in ("NFL", "NCAAF", "NBA", "NCAAB"):
+        if not games_today(sport): continue
+        weekend_football = sport in ("NFL", "NCAAF") and wd in (5, 6)
+        if morning == weekend_football:  # weekend football early; everything else in the afternoon
+            plan.append(sport)
+    return plan
+
 # ------------------------------------------------------------------ index
 def write_index(state):
     idx = {"updated": NOW.isoformat(timespec="seconds"), "sports": {}, "notes": state.get("notes", {})}
     for sport in ("NFL", "NCAAF", "NBA", "NCAAB"):
-        ent = {"base": os.path.exists(os.path.join(DATA, "base", f"{sport}.json")), "api": [], "archive": []}
+        ent = {"base": os.path.exists(os.path.join(DATA, "base", f"{sport}.json")), "api": [], "archive": [],
+               "splits": os.path.exists(os.path.join(DATA, "splits", f"{sport}.json"))}
         for kind in ("api", "archive"):
             d = os.path.join(DATA, kind, sport)
             if os.path.isdir(d):
@@ -924,6 +1028,8 @@ def main():
         if sp in sports:
             tracks[sp] = guard(f"{sp} odds", lambda sp=sp: odds_update(sp, with_scores=(sp == "NBA" and not args.odds_only), test=args.test))
     if args.test:
+        for sp in [x for x in ("NFL", "NBA", "NCAAF", "NCAAB") if x in sports][:2]:
+            guard(f"{sp} public betting test", lambda sp=sp: pull_splits(sp, test=True))
         if "NBA" in sports:
             guard("NBA catch-up test", lambda: nba_catchup(tracks.get("NBA") or {"events": {}}, {}, budget=5, test=True))
             guard("NBA past-season test", lambda: nba_backfill({}, budget=5, test=True))
@@ -969,6 +1075,8 @@ def main():
                 if s != cur:
                     state["done"].setdefault(sp, []).append(s)
 
+    for sp in [x for x in splits_plan(morning=not args.odds_only) if x in sports or args.odds_only]:
+        guard(f"{sp} public betting", lambda sp=sp: pull_splits(sp))
     save("state.json", state, pretty=True)
     write_index(state)
     say(f"Done. CFBD/CBBD calls this run: {STATS['cfbd_calls']}. Odds API credits left: {STATS['odds_credits_left']}")
