@@ -123,7 +123,7 @@ def save(path, obj, pretty=False):
         json.dump(obj, f, indent=1 if pretty else None, separators=None if pretty else (",", ":"))
 
 KEEP = ["id", "date", "season", "week", "post", "home", "away", "hs", "as", "neu", "div", "hc", "ac",
-        "sp", "spO", "tot", "totO", "hml", "aml", "hso", "aso", "oo", "uo", "lineFlag"]
+        "sp", "spO", "tot", "totO", "hml", "aml", "hso", "aso", "oo", "uo", "lineFlag", "kick", "best", "venue"]
 
 def save_season(sport, season, games, source):
     rows = []
@@ -165,8 +165,18 @@ def lines_to_game(x, sport, extra=None):
     ls = x.get("lines") or []
     sp = med([l.get("spread") for l in ls])
     spO = med([l.get("spreadOpen") for l in ls])
+    def bestp(vals, hi=True):
+        v = [(l.get(k_), l.get("provider")) for l in ls for k_ in [vals] if isinstance(l.get(k_), (int, float))]
+        if not v: return None
+        b = max(v, key=lambda t: t[0]) if hi else min(v, key=lambda t: t[0])
+        return [clean(b[0]), b[1]]
+    try:
+        kt = datetime.fromisoformat(str(x.get("startDate")).replace("Z", "+00:00")).astimezone(ET); kick = kt.hour * 100 + kt.minute
+    except Exception:
+        kick = None
     g = {
         "id": x.get("id", x.get("gameId")),
+        "kick": kick,
         "date": ymd(x.get("startDate")),
         "week": x.get("week") if sport == "NCAAF" else None,
         "post": str(x.get("seasonType", "regular")).lower() not in ("regular", "1"),
@@ -188,6 +198,11 @@ def lines_to_game(x, sport, extra=None):
         g["div"] = g["hc"] == g["ac"]
     if g["hs"] is None or g["as"] is None:
         g["hs"] = g["as"] = None
+        # upcoming: best number across sportsbooks (home spread: most points; away = minus the lowest home spread)
+        bh, bl_ = bestp("spread", True), bestp("spread", False)
+        bo, bu = bestp("overUnder", False), bestp("overUnder", True)
+        g["best"] = {k: v for k, v in (("sp_home", bh), ("sp_away", [-bl_[0], bl_[1]] if bl_ else None), ("t_over", bo), ("t_under", bu)) if v}
+    if extra and extra.get("venueId") is not None: g["venue"] = extra.get("venueId")
     if g["date"]:
         g["season"] = season_of(sport, g["date"])
     return g
@@ -304,8 +319,34 @@ def odds_snapshot(sport, ev):
             elif m.get("key") == "h2h" and home in oc and away in oc:
                 hml.append(oc[home].get("price")); aml.append(oc[away].get("price"))
     snap = {"sp": med(sp), "tot": med(tot), "hml": med(hml, price=True), "aml": med(aml, price=True), "hso": med(hso, price=True), "aso": med(aso, price=True),
+            "best": best_lines(ev),
             "oo": med(oo, price=True), "uo": med(uo, price=True), "books": len(ev.get("bookmakers", [])), "at": NOW.isoformat(timespec="minutes")}
     return snap if any(snap[k] is not None for k in ("sp", "tot", "hml")) else None
+
+def best_lines(ev):
+    """Best available number and price per side across US sportsbooks (line shopping)."""
+    home, away = ev["home_team"], ev["away_team"]; best = {}
+    def upd(key, point, price, name, more_is_better):
+        if point is None or price is None: return
+        cur = best.get(key); sgn = 1 if more_is_better else -1
+        if cur is None or (sgn * point, price) > (sgn * cur[0], cur[1]): best[key] = [point, price, name]
+    for bk in ev.get("bookmakers", []):
+        name = bk.get("title") or bk.get("key")
+        for m in bk.get("markets", []):
+            oc = {o.get("name"): o for o in m.get("outcomes", [])}
+            if m.get("key") == "spreads":
+                for side, team in (("home", home), ("away", away)):
+                    o = oc.get(team)
+                    if o: upd("sp_" + side, o.get("point"), o.get("price"), name, True)
+            elif m.get("key") == "totals":
+                if oc.get("Over"): upd("t_over", oc["Over"].get("point"), oc["Over"].get("price"), name, False)
+                if oc.get("Under"): upd("t_under", oc["Under"].get("point"), oc["Under"].get("price"), name, True)
+            elif m.get("key") == "h2h":
+                for side, team in (("home", home), ("away", away)):
+                    o = oc.get(team)
+                    if o and o.get("price") is not None and (not best.get("ml_" + side) or o["price"] > best["ml_" + side][0]):
+                        best["ml_" + side] = [o["price"], name]
+    return best
 
 def odds_update(sport, with_scores, test=False):
     if not ODDS_KEY:
@@ -343,6 +384,12 @@ def odds_update(sport, with_scores, test=False):
             except (KeyError, TypeError, ValueError):
                 pass
     say(f"  {sport}: {len(evs or [])} upcoming games priced, {n_new} new openers captured. Odds API credits left: {STATS['odds_credits_left']}")
+    if not test:
+        bl = {}
+        for e in track["events"].values():
+            if e.get("last") and e["last"].get("best") and not e.get("hs") and e.get("date"):
+                bl[f"{e['date']}|{e['home']}|{e['away']}"] = e["last"]["best"]
+        save(f"odds/best_{sport}.json", {"updated": NOW.isoformat(timespec="seconds"), "games": bl})
     if test:
         if evs:
             say(f"  sample: {json.dumps(odds_snapshot(sport, evs[0]))}  ({evs[0]['away_team']} @ {evs[0]['home_team']})")
@@ -1284,6 +1331,8 @@ def model_predictions(sport):
         ph, pa = pts.get((g["game"], g["home"])), pts.get((g["game"], g["away"]))
         if ph and pa: g["pts_proj"] = (ph[0] + pa[1] + pa[0] + ph[1]) / 2
         if sport == "NFL" and not g.get("dome"):
+            wx = load("weather/NFL.json", {"games": {}})["games"].get(f"{g['order']}|{g['home']}|{g['away']}")
+            if wx and wx.get("wind") is not None: g["wind"] = wx["wind"]; g["temp"] = wx.get("temp")
             if g.get("wind") is None: g["wind"] = 7.7   # typical outdoor wind until a forecast is known
         x = M.game_features(g, fh, fa, rfeat[g["game"]])
         ats = M.predict(P, x, "ats")
@@ -1319,6 +1368,83 @@ def flag_reversed_lines(sport, seasons):
         save(path, js); total += n
     say(f"  {sport} line check: {total} games flagged as likely reversed spreads ({', '.join(map(str, seasons))})")
 
+# ------------------------------------------------------------------ college football team locations (for travel filters)
+TZ_OFF = {"America/New_York": -5, "America/Detroit": -5, "America/Indiana/Indianapolis": -5, "America/Kentucky/Louisville": -5, "America/Chicago": -6,
+          "America/Denver": -7, "America/Boise": -7, "America/Phoenix": -7, "America/Los_Angeles": -8, "Pacific/Honolulu": -10, "America/Anchorage": -9, "America/Puerto_Rico": -4}
+def cfb_teams():
+    path = os.path.join(DATA, "static", "cfb_teams.json")
+    if os.path.exists(path) and time.time() - os.path.getmtime(path) < 30 * 86400: return
+    js = cfbd(CFB, "/teams", {"year": season_of("NCAAF", TODAY)})
+    out, venues = {}, {}
+    for t in js or []:
+        loc = t.get("location") or {}
+        lat, lon = loc.get("latitude"), loc.get("longitude")
+        if lat is None or lon is None: continue
+        el = loc.get("elevation"); el = float(el) * 3.281 if el not in (None, "") else 0   # meters -> feet
+        tz = TZ_OFF.get(loc.get("timezone"), round(float(lon) / 15))
+        out[t.get("school")] = [round(float(lat), 3), round(float(lon), 3), tz, round(el)]
+        if loc.get("id") is not None: venues[str(loc["id"])] = {"lat": float(lat), "lon": float(lon), "dome": bool(loc.get("dome"))}
+    save("static/cfb_teams.json", {"updated": NOW.isoformat(timespec="seconds"), "teams": out, "venues": venues})
+    say(f"  NCAAF team locations: {len(out)} teams")
+
+# ------------------------------------------------------------------ weather forecasts (Open-Meteo, free, no key)
+NFL_STADIUM = {"ARI": (33.528, -112.263), "ATL": (33.755, -84.401), "BAL": (39.278, -76.623), "BUF": (42.774, -78.787), "CAR": (35.226, -80.853), "CHI": (41.862, -87.617),
+    "CIN": (39.096, -84.516), "CLE": (41.506, -81.700), "DAL": (32.747, -97.095), "DEN": (39.744, -105.020), "DET": (42.340, -83.046), "GB": (44.501, -88.062), "HOU": (29.685, -95.411),
+    "IND": (39.760, -86.164), "JAX": (30.324, -81.637), "KC": (39.049, -94.484), "LV": (36.091, -115.183), "LAC": (33.954, -118.339), "LA": (33.954, -118.339), "MIA": (25.958, -80.239),
+    "MIN": (44.974, -93.258), "NE": (42.091, -71.264), "NO": (29.951, -90.081), "NYG": (40.814, -74.075), "NYJ": (40.814, -74.075), "PHI": (39.901, -75.168), "PIT": (40.447, -80.016),
+    "SF": (37.403, -121.970), "SEA": (47.595, -122.332), "TB": (27.976, -82.503), "TEN": (36.167, -86.771), "WAS": (38.908, -76.865)}
+NFL_INDOOR = {"ATL", "ARI", "DAL", "DET", "HOU", "IND", "LV", "LA", "LAC", "MIN", "NO"}   # domes, retractable roofs and SoFi's covered stadium
+def forecast(lat, lon, ymd_, hour):
+    d = f"{ymd_ // 10000:04d}-{ymd_ // 100 % 100:02d}-{ymd_ % 100:02d}"
+    js = http_json("https://api.open-meteo.com/v1/forecast?" + urllib.parse.urlencode({"latitude": lat, "longitude": lon, "hourly": "temperature_2m,wind_speed_10m,wind_gusts_10m,precipitation_probability",
+        "temperature_unit": "fahrenheit", "wind_speed_unit": "mph", "timezone": "America/New_York", "start_date": d, "end_date": d}))
+    h = (js or {}).get("hourly") or {}; times = h.get("time") or []
+    if not times: return None
+    want = f"{d}T{max(0, min(23, hour)):02d}:00"
+    i = times.index(want) if want in times else min(range(len(times)), key=lambda k: abs(int(times[k][11:13]) - hour))
+    # average the kickoff hour and the next two (most of the game)
+    idx = [j for j in (i, i + 1, i + 2) if j < len(times)]
+    av = lambda key: round(sum(h[key][j] for j in idx if h[key][j] is not None) / max(1, sum(1 for j in idx if h[key][j] is not None)), 1) if h.get(key) else None
+    return {"wind": av("wind_speed_10m"), "gust": av("wind_gusts_10m"), "temp": av("temperature_2m"), "precip": av("precipitation_probability"), "hour": hour}
+
+def weather_nfl():
+    rows = list(csv.DictReader(io.StringIO(http_text(NFLV))))
+    today = int(TODAY.strftime("%Y%m%d")); limit = int((TODAY + timedelta(days=7)).strftime("%Y%m%d")); out = {}
+    for x in rows:
+        d = int(x["gameday"].replace("-", ""))
+        if d < today or d > limit or x.get("home_score") not in ("", "NA"): continue
+        key = f"{d}|{x['home_team']}|{x['away_team']}"
+        if x.get("roof") in ("dome", "closed") or (not x.get("roof") and x["home_team"] in NFL_INDOOR): out[key] = {"dome": True}; continue
+        if x.get("location") == "Neutral" or x["home_team"] not in NFL_STADIUM: continue
+        try: hour = int((x.get("gametime") or "13:00")[:2])
+        except ValueError: hour = 13
+        lat, lon = NFL_STADIUM[x["home_team"]]
+        w = forecast(lat, lon, d, hour)
+        if w: out[key] = {**w, "roof": x.get("roof")}
+        time.sleep(0.3)
+    save("weather/NFL.json", {"updated": NOW.isoformat(timespec="seconds"), "source": "Open-Meteo forecast", "games": out})
+    say(f"  NFL weather: forecasts for {sum(1 for v in out.values() if not v.get('dome'))} outdoor games, {sum(1 for v in out.values() if v.get('dome'))} in domes")
+
+def weather_cfb():
+    teams = load("static/cfb_teams.json", {"teams": {}, "venues": {}})
+    y = season_of("NCAAF", TODAY); gs = load(f"api/NCAAF/{y}.json", {"games": []})["games"]
+    today = int(TODAY.strftime("%Y%m%d")); limit = int((TODAY + timedelta(days=7)).strftime("%Y%m%d")); out = {}
+    for g in gs:
+        if g.get("hs") is not None or not (today <= g["date"] <= limit): continue
+        v = teams["venues"].get(str(g.get("venue"))) if g.get("venue") is not None else None
+        if v is None:
+            if g.get("neu"): continue
+            loc = teams["teams"].get(g["home"])
+            if not loc: continue
+            v = {"lat": loc[0], "lon": loc[1], "dome": False}
+        key = f"{g['date']}|{g['home']}|{g['away']}"
+        if v.get("dome"): out[key] = {"dome": True}; continue
+        w = forecast(v["lat"], v["lon"], g["date"], (g.get("kick") or 1200) // 100)
+        if w: out[key] = w
+        time.sleep(0.2)
+    save("weather/NCAAF.json", {"updated": NOW.isoformat(timespec="seconds"), "source": "Open-Meteo forecast", "games": out})
+    say(f"  NCAAF weather: forecasts for {len(out)} games")
+
 # ------------------------------------------------------------------ index
 def write_index(state):
     idx = {"updated": NOW.isoformat(timespec="seconds"), "sports": {}, "notes": state.get("notes", {})}
@@ -1327,7 +1453,9 @@ def write_index(state):
                "splits": os.path.exists(os.path.join(DATA, "splits", f"{sport}.json")),
                "metrics": os.path.exists(os.path.join(DATA, "metrics", f"{sport}.json")),
                "injuries": os.path.exists(os.path.join(DATA, "injuries", f"{sport}.json")),
-               "model": os.path.exists(os.path.join(DATA, "model", f"{sport}.json"))}
+               "model": os.path.exists(os.path.join(DATA, "model", f"{sport}.json")),
+               "weather": os.path.exists(os.path.join(DATA, "weather", f"{sport}.json")),
+               "best": os.path.exists(os.path.join(DATA, "odds", f"best_{sport}.json"))}
         for kind in ("api", "archive"):
             d = os.path.join(DATA, kind, sport)
             if os.path.isdir(d):
@@ -1424,6 +1552,9 @@ def main():
         for sp, fn in (("NFL", nfl_metrics), ("NFL", nfl_injuries), ("NBA", nba_metrics), ("NCAAF", cfb_metrics), ("NCAAB", cbb_metrics)):
             if sp in sports and (sp not in ("NCAAF", "NCAAB") or CFBD_KEY):
                 guard(f"{sp} {fn.__name__}", fn)
+        if "NCAAF" in sports and CFBD_KEY: guard("NCAAF team locations", cfb_teams)
+        if "NFL" in sports: guard("NFL weather", weather_nfl)
+        if "NCAAF" in sports: guard("NCAAF weather", weather_cfb)
         for sp in ("NFL", "NCAAF"):
             if sp in sports:
                 guard(f"{sp} model", lambda sp=sp: model_predictions(sp))
