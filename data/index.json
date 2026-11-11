@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-11T01:51:44+00:00",
+ "updated": "2026-11-11T02:28:49+00:00",
  "sports": {
   "NFL": {
    "base": true,
@@ -69,7 +69,7 @@
    "splits": true,
    "metrics": true,
    "injuries": false,
-   "model": false
+   "model": true
   }
  },
  "notes": {}
