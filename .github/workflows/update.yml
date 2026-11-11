@@ -32,6 +32,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install Python add-ons
+        run: pip install --quiet pyarrow
+
       - name: Run updater
         env:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
