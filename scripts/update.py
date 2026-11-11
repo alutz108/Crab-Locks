@@ -21,6 +21,7 @@ Options
   --test                         fetch a little from each source, print it, save nothing
 """
 import argparse, csv, io, json, os, statistics, sys, time, urllib.parse, urllib.request, urllib.error
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from datetime import date, datetime, timedelta, timezone
 
 try:
@@ -983,12 +984,280 @@ def splits_plan(morning):
             plan.append(sport)
     return plan
 
+# ------------------------------------------------------------------ advanced metrics + injuries
+import gzip
+NFLV_PBP = "https://github.com/nflverse/nflverse-data/releases/download/pbp/play_by_play_{y}.csv.gz"
+NFLV_INJ = "https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_{y}.csv"
+NBA_BOX = "https://github.com/sportsdataverse/sportsdataverse-data/releases/download/espn_nba_team_boxscores/team_box_{y}.csv"
+
+def _f(v):
+    try:
+        x = float(v); return None if x != x else x
+    except (TypeError, ValueError):
+        return None
+
+def nfl_metrics():
+    y = season_of("NFL", TODAY)
+    req = urllib.request.Request(NFLV_PBP.format(y=y), headers={"User-Agent": "crab-locks-updater"})
+    with urllib.request.urlopen(req, timeout=180) as r:
+        raw = r.read()
+    rows = csv.DictReader(io.StringIO(gzip.decompress(raw).decode("utf-8")))
+    agg = {}
+    games = {}
+    for x in rows:
+        if x.get("season_type") not in ("REG", "POST"): continue
+        if x.get("pass") != "1" and x.get("rush") != "1": continue
+        epa, suc = _f(x.get("epa")), _f(x.get("success"))
+        if epa is None: continue
+        for team, side in ((x.get("posteam"), "o"), (x.get("defteam"), "d")):
+            if not team: continue
+            a = agg.setdefault(team, {"o": [0, 0, 0, 0, 0, 0, 0], "d": [0, 0, 0, 0, 0, 0, 0], "games": {}})
+            v = a[side]; v[0] += 1; v[1] += epa; v[2] += suc or 0
+            if x.get("pass") == "1": v[3] += 1; v[4] += epa
+            else: v[5] += 1; v[6] += epa
+            g = a["games"].setdefault(x.get("game_id"), {"o": [0, 0], "d": [0, 0], "wk": int(x.get("week") or 0)})
+            g[side][0] += 1; g[side][1] += epa
+    out = {}
+    for team, a in agg.items():
+        o, d = a["o"], a["d"]
+        last = sorted(a["games"].values(), key=lambda g: g["wk"])[-4:]
+        l4o = sum(g["o"][1] for g in last) / max(1, sum(g["o"][0] for g in last))
+        l4d = sum(g["d"][1] for g in last) / max(1, sum(g["d"][0] for g in last))
+        out[team] = {"games": len(a["games"]), "plays": o[0],
+                     "off_epa": round(o[1] / max(1, o[0]), 3), "off_sr": round(o[2] / max(1, o[0]), 3),
+                     "off_pass_epa": round(o[4] / max(1, o[3]), 3), "off_rush_epa": round(o[6] / max(1, o[5]), 3),
+                     "def_epa": round(d[1] / max(1, d[0]), 3), "def_sr": round(d[2] / max(1, d[0]), 3),
+                     "def_pass_epa": round(d[4] / max(1, d[3]), 3), "def_rush_epa": round(d[6] / max(1, d[5]), 3),
+                     "l4_off_epa": round(l4o, 3), "l4_def_epa": round(l4d, 3)}
+    # Pro Football Reference charting stats (pressures, bad throws, drops), as published by nflverse
+    try:
+        pf = list(csv.DictReader(io.StringIO(http_text(f"https://github.com/nflverse/nflverse-data/releases/download/pfr_advstats/advstats_week_pass_{y}.csv"))))
+        tot = {}
+        for x in pf:
+            pr, pct = _f(x.get("times_pressured")), _f(x.get("times_pressured_pct"))
+            db = pr / pct if pr and pct else None
+            bt, btp = _f(x.get("passing_bad_throws")), _f(x.get("passing_bad_throw_pct"))
+            att = bt / btp if bt and btp else None
+            dr, drp = _f(x.get("passing_drops")), _f(x.get("passing_drop_pct"))
+            att2 = dr / drp if dr and drp else None
+            for team, side in ((x.get("team"), "o"), (x.get("opponent"), "d")):
+                if not team: continue
+                t = tot.setdefault(team, {"o": [0, 0, 0, 0, 0, 0], "d": [0, 0]})
+                if side == "o":
+                    if db: t["o"][0] += pr; t["o"][1] += db
+                    if att: t["o"][2] += bt; t["o"][3] += att
+                    if att2: t["o"][4] += dr; t["o"][5] += att2
+                elif db:
+                    t["d"][0] += pr; t["d"][1] += db
+        for team, t in tot.items():
+            e = out.setdefault(team, {})
+            if t["o"][1]: e["pressure_allowed"] = round(t["o"][0] / t["o"][1], 3)
+            if t["o"][3]: e["bad_throw_pct"] = round(t["o"][2] / t["o"][3], 3)
+            if t["o"][5]: e["drop_pct"] = round(t["o"][4] / t["o"][5], 3)
+            if t["d"][1]: e["pressure_rate"] = round(t["d"][0] / t["d"][1], 3)
+    except Exception as e:
+        say(f"  ! NFL Pro Football Reference stats skipped: {e}")
+    save("metrics/NFL.json", {"updated": NOW.isoformat(timespec="seconds"), "season": y, "source": "nflverse play-by-play and Pro Football Reference advanced stats (via nflverse)", "teams": out})
+    say(f"  NFL advanced metrics: {len(out)} teams from nflverse play-by-play")
+
+def nfl_injuries():
+    y = season_of("NFL", TODAY)
+    text = http_text(NFLV_INJ.format(y=y))
+    rows = list(csv.DictReader(io.StringIO(text)))
+    if not rows: return
+    latest = {}
+    for x in rows:
+        try: wk = int(x.get("week") or 0)
+        except ValueError: continue
+        latest[x["team"]] = max(latest.get(x["team"], 0), wk)
+    out = {}
+    for x in rows:
+        t = x.get("team")
+        if int(x.get("week") or 0) != latest.get(t): continue
+        st = (x.get("report_status") or "").strip()
+        if st not in ("Out", "Doubtful", "Questionable"): continue
+        out.setdefault(t, []).append({"name": x.get("full_name"), "pos": x.get("position"), "status": st,
+                                     "injury": x.get("report_primary_injury") or x.get("practice_primary_injury") or ""})
+    order = {"Out": 0, "Doubtful": 1, "Questionable": 2}
+    for t in out: out[t].sort(key=lambda p: (order.get(p["status"], 3), p["pos"] or ""))
+    save("injuries/NFL.json", {"updated": NOW.isoformat(timespec="seconds"), "season": y, "week": max(latest.values()), "source": "nflverse (official NFL injury reports)", "teams": out})
+    say(f"  NFL injuries: week {max(latest.values())}, {sum(len(v) for v in out.values())} players listed")
+
+def nba_metrics():
+    y = season_of("NBA", TODAY) + 1  # ESPN labels NBA seasons by their ending year
+    rows = list(csv.DictReader(io.StringIO(http_text(NBA_BOX.format(y=y)))))
+    by_game = {}
+    for x in rows:
+        if x.get("season_type") not in ("2", "3", "5"): continue
+        by_game.setdefault(x["game_id"], []).append(x)
+    agg = {}
+    for gid, pair in by_game.items():
+        if len(pair) != 2: continue
+        for me, op in ((pair[0], pair[1]), (pair[1], pair[0])):
+            g = lambda r, k: _f(r.get(k)) or 0
+            poss_me = g(me, "field_goals_attempted") - g(me, "offensive_rebounds") + g(me, "turnovers") + 0.44 * g(me, "free_throws_attempted")
+            poss_op = g(op, "field_goals_attempted") - g(op, "offensive_rebounds") + g(op, "turnovers") + 0.44 * g(op, "free_throws_attempted")
+            poss = (poss_me + poss_op) / 2
+            if poss <= 0: continue
+            a = agg.setdefault(me["team_short_display_name"], {"g": [], "pts": 0, "opp": 0, "poss": 0, "fgm": 0, "fg3": 0, "fga": 0, "fta": 0, "tov": 0, "orb": 0, "odrb": 0,
+                                                              "ofgm": 0, "ofg3": 0, "ofga": 0, "ofta": 0, "otov": 0, "oorb": 0, "drb": 0})
+            a["g"].append((me["game_date"], g(me, "team_score"), g(op, "team_score"), poss))
+            a["pts"] += g(me, "team_score"); a["opp"] += g(op, "team_score"); a["poss"] += poss
+            a["fgm"] += g(me, "field_goals_made"); a["fg3"] += g(me, "three_point_field_goals_made"); a["fga"] += g(me, "field_goals_attempted"); a["fta"] += g(me, "free_throws_attempted")
+            a["tov"] += g(me, "turnovers"); a["orb"] += g(me, "offensive_rebounds"); a["odrb"] += g(op, "defensive_rebounds"); a["drb"] += g(me, "defensive_rebounds")
+            a["ofgm"] += g(op, "field_goals_made"); a["ofg3"] += g(op, "three_point_field_goals_made"); a["ofga"] += g(op, "field_goals_attempted"); a["ofta"] += g(op, "free_throws_attempted")
+            a["otov"] += g(op, "turnovers"); a["oorb"] += g(op, "offensive_rebounds")
+    out = {}
+    for t, a in agg.items():
+        n = len(a["g"]); P = a["poss"] or 1
+        last = sorted(a["g"])[-10:]; lp = sum(x[3] for x in last) or 1
+        out[t] = {"games": n, "pace": round(P / n, 1), "ortg": round(a["pts"] / P * 100, 1), "drtg": round(a["opp"] / P * 100, 1),
+                  "net": round((a["pts"] - a["opp"]) / P * 100, 1), "l10_net": round((sum(x[1] for x in last) - sum(x[2] for x in last)) / lp * 100, 1),
+                  "efg": round((a["fgm"] + 0.5 * a["fg3"]) / max(1, a["fga"]), 3), "tov": round(a["tov"] / P, 3),
+                  "orb": round(a["orb"] / max(1, a["orb"] + a["odrb"]), 3), "ftr": round(a["fta"] / max(1, a["fga"]), 3),
+                  "oefg": round((a["ofgm"] + 0.5 * a["ofg3"]) / max(1, a["ofga"]), 3), "otov": round(a["otov"] / P, 3),
+                  "drb": round(a["drb"] / max(1, a["drb"] + a["oorb"]), 3), "oftr": round(a["ofta"] / max(1, a["ofga"]), 3)}
+    save("metrics/NBA.json", {"updated": NOW.isoformat(timespec="seconds"), "season": season_of("NBA", TODAY), "source": "ESPN box scores via sportsdataverse", "teams": out})
+    say(f"  NBA advanced metrics: {len(out)} teams")
+
+def cfb_metrics():
+    y = season_of("NCAAF", TODAY)
+    adv = cfbd(CFB, "/stats/season/advanced", {"year": y, "excludeGarbageTime": "true"})
+    sp = cfbd(CFB, "/ratings/sp", {"year": y})
+    out = {}
+    for x in adv or []:
+        o, d = x.get("offense") or {}, x.get("defense") or {}
+        out[x.get("team")] = {"off_ppa": o.get("ppa"), "off_sr": o.get("successRate"), "off_expl": o.get("explosiveness"),
+                              "def_ppa": d.get("ppa"), "def_sr": d.get("successRate"), "def_expl": d.get("explosiveness"),
+                              "havoc": (d.get("havoc") or {}).get("total")}
+    for x in sp or []:
+        t = x.get("team")
+        if not t or t == "nationalAverages": continue
+        e = out.setdefault(t, {})
+        e.update({"sp": x.get("rating"), "sp_rank": x.get("ranking"), "sp_off": (x.get("offense") or {}).get("rating"), "sp_def": (x.get("defense") or {}).get("rating"),
+                  "sp_off_rank": (x.get("offense") or {}).get("ranking"), "sp_def_rank": (x.get("defense") or {}).get("ranking")})
+    save("metrics/NCAAF.json", {"updated": NOW.isoformat(timespec="seconds"), "season": y, "source": "CollegeFootballData.com (advanced stats, SP+)", "teams": out})
+    say(f"  NCAAF advanced metrics: {len(out)} teams")
+
+def cbb_metrics():
+    start = season_of("NCAAB", TODAY)
+    adj, stats, used = [], [], None
+    for y in (start + 1, start):  # CBBD labels seasons by ending year; fall back just in case
+        adj = cfbd(CBB, "/ratings/adjusted", {"season": y})
+        if adj: used = y; break
+    if used: stats = cfbd(CBB, "/stats/team/season", {"season": used})
+    out = {}
+    for x in adj or []:
+        r = x.get("rankings") or {}
+        out[x.get("team")] = {"adj_off": x.get("offensiveRating"), "adj_def": x.get("defensiveRating"), "adj_net": x.get("netRating"),
+                              "off_rank": r.get("offense"), "def_rank": r.get("defense"), "net_rank": r.get("net")}
+    for x in stats or []:
+        e = out.setdefault(x.get("team"), {}); ts, os_ = x.get("teamStats") or {}, x.get("opponentStats") or {}
+        tf, of = ts.get("fourFactors") or {}, os_.get("fourFactors") or {}
+        e.update({"pace": x.get("pace"), "games": x.get("games"), "efg": tf.get("effectiveFieldGoalPct"), "tov": tf.get("turnoverRatio"), "orb": tf.get("offensiveReboundPct"),
+                  "ftr": tf.get("freeThrowRate"), "oefg": of.get("effectiveFieldGoalPct"), "otov": of.get("turnoverRatio"), "drb": (100 - of["offensiveReboundPct"]) if isinstance(of.get("offensiveReboundPct"), (int, float)) else None, "oftr": of.get("freeThrowRate")})
+    save("metrics/NCAAB.json", {"updated": NOW.isoformat(timespec="seconds"), "season": start, "source": "CollegeBasketballData.com (adjusted efficiency, four factors)", "teams": out})
+    say(f"  NCAAB advanced metrics: {len(out)} teams (season label {used})")
+
+# ------------------------------------------------------------------ Crab Locks model (NFL, NCAAF)
+def _team_games_nfl(y):
+    req = urllib.request.Request(NFLV_PBP.format(y=y), headers={"User-Agent": "crab-locks-updater"})
+    with urllib.request.urlopen(req, timeout=240) as r:
+        rows = csv.DictReader(io.StringIO(gzip.decompress(r.read()).decode("utf-8")))
+    agg = {}
+    for x in rows:
+        if x.get("pass") != "1" and x.get("rush") != "1": continue
+        epa = _f(x.get("epa"))
+        if epa is None: continue
+        for team, side in ((x.get("posteam"), "o"), (x.get("defteam"), "d")):
+            if not team: continue
+            k = (x["game_id"], team, side)
+            a = agg.setdefault(k, {"season": int(x["season"]), "order": int(x["game_date"].replace("-", "")), "game": x["game_id"], "team": team, "side": side,
+                                   "plays": 0, "epa": 0.0, "succ": 0.0, "pplays": 0, "pepa": 0.0})
+            a["plays"] += 1; a["epa"] += epa; a["succ"] += _f(x.get("success")) or 0
+            if x.get("pass") == "1": a["pplays"] += 1; a["pepa"] += epa
+    return list(agg.values())
+
+def _team_games_cfb(y, order_of):
+    import pyarrow.parquet as pq
+    url = f"https://github.com/sportsdataverse/sportsdataverse-data/releases/download/cfbfastR_cfb_pbp/play_by_play_{y}.parquet"
+    path = os.path.join(ROOT, f".cfb_pbp_{y}.parquet")
+    urllib.request.urlretrieve(url, path)
+    t = pq.read_table(path, columns=["game_id", "season", "pos_team", "def_pos_team", "EPA", "success", "pass", "rush"]).to_pylist()
+    os.remove(path)
+    agg = {}
+    for x in t:
+        if (x["pass"] != 1 and x["rush"] != 1) or x["EPA"] is None: continue
+        gid = str(x["game_id"])
+        if gid not in order_of: continue
+        for team, side in ((x["pos_team"], "o"), (x["def_pos_team"], "d")):
+            if not team: continue
+            a = agg.setdefault((gid, team, side), {"season": int(x["season"]), "order": order_of[gid], "game": gid, "team": team, "side": side, "plays": 0, "epa": 0.0, "succ": 0.0, "pplays": 0, "pepa": 0.0})
+            a["plays"] += 1; a["epa"] += x["EPA"]; a["succ"] += x["success"] or 0
+            if x["pass"] == 1: a["pplays"] += 1; a["pepa"] += x["EPA"]
+    return list(agg.values())
+
+def model_predictions(sport):
+    import model as M
+    params = load("static/model_params.json", None)
+    if not params or sport not in params["sports"]: return
+    P = params["sports"][sport]
+    y = season_of(sport, TODAY)
+    games = {}
+    if sport == "NFL":
+        for x in csv.DictReader(io.StringIO(http_text(NFLV))):
+            s = int(x["season"])
+            if s not in (y - 1, y): continue
+            n = lambda k: None if x.get(k) in ("", "NA", None) else float(x[k])
+            sl = n("spread_line")
+            games[x["game_id"]] = dict(game=x["game_id"], season=s, order=int(x["gameday"].replace("-", "")), home=x["home_team"], away=x["away_team"],
+                hs=n("home_score"), sp=-sl if sl is not None else None, tot=n("total_line"), neu=x["location"] == "Neutral",
+                rest_h=n("home_rest"), rest_a=n("away_rest"), conf=x["div_game"] == "1", wind=n("wind"), temp=n("temp"), dome=x["roof"] in ("dome", "closed"))
+            games[x["game_id"]]["as"] = n("away_score")
+        tg = _team_games_nfl(y - 1) + _team_games_nfl(y)
+    else:
+        last = {}
+        for s in (y - 1, y):
+            for x in load(f"api/NCAAF/{s}.json", {"games": []})["games"]:
+                games[str(x["id"])] = dict(game=str(x["id"]), season=s, order=x["date"], home=x["home"], away=x["away"], hs=x.get("hs"), sp=x.get("sp"), tot=x.get("tot"),
+                                           neu=bool(x.get("neu")), conf=bool(x.get("div")))
+                games[str(x["id"])]["as"] = x.get("as")
+        for g in sorted(games.values(), key=lambda g: g["order"]):
+            d = date(g["order"] // 10000, g["order"] // 100 % 100, g["order"] % 100)
+            for side, t in (("rest_h", g["home"]), ("rest_a", g["away"])):
+                L = last.get((g["season"], t)); g[side] = (d - L).days if L else 14; last[(g["season"], t)] = d
+        order_of = {k: g["order"] for k, g in games.items()}
+        tg = _team_games_cfb(y - 1, order_of) + _team_games_cfb(y, order_of)
+    gbs = {}
+    for g in games.values(): gbs.setdefault(g["season"], []).append(g)
+    feats, rfeat = M.team_asof(sport, tg, gbs); cur = M.team_asof.current
+    pts = M.points_asof(gbs, sport)
+    out = {}
+    today = int(TODAY.strftime("%Y%m%d"))
+    for g in games.values():
+        if g["season"] != y or g.get("hs") is not None or g["order"] < today or g.get("sp") is None or g.get("tot") is None: continue
+        fh, fa = cur.get((y, g["home"])), cur.get((y, g["away"]))
+        if not fh or not fa or g["game"] not in rfeat: continue
+        ph, pa = pts.get((g["game"], g["home"])), pts.get((g["game"], g["away"]))
+        if ph and pa: g["pts_proj"] = (ph[0] + pa[1] + pa[0] + ph[1]) / 2
+        if sport == "NFL" and not g.get("dome"):
+            if g.get("wind") is None: g["wind"] = 7.7   # typical outdoor wind until a forecast is known
+        x = M.game_features(g, fh, fa, rfeat[g["game"]])
+        ats = M.predict(P, x, "ats")
+        tot = M.predict(P, x, "tot") - P["tot"]["intercept"]   # centred: games finish above the total on average (shootouts), which isn't an over lean
+        out[f"{g['order']}|{g['home']}|{g['away']}"] = {"ats": round(ats, 2), "tot": round(tot, 2), "sp": g["sp"], "line_tot": g["tot"]}
+    save(f"model/{sport}.json", {"updated": NOW.isoformat(timespec="seconds"), "season": y, "tested": P["tested"], "record": P["record"], "lean": P["lean"], "games": out})
+    say(f"  {sport} model: predictions for {len(out)} upcoming games")
+
 # ------------------------------------------------------------------ index
 def write_index(state):
     idx = {"updated": NOW.isoformat(timespec="seconds"), "sports": {}, "notes": state.get("notes", {})}
     for sport in ("NFL", "NCAAF", "NBA", "NCAAB"):
         ent = {"base": os.path.exists(os.path.join(DATA, "base", f"{sport}.json")), "api": [], "archive": [],
-               "splits": os.path.exists(os.path.join(DATA, "splits", f"{sport}.json"))}
+               "splits": os.path.exists(os.path.join(DATA, "splits", f"{sport}.json")),
+               "metrics": os.path.exists(os.path.join(DATA, "metrics", f"{sport}.json")),
+               "injuries": os.path.exists(os.path.join(DATA, "injuries", f"{sport}.json")),
+               "model": os.path.exists(os.path.join(DATA, "model", f"{sport}.json"))}
         for kind in ("api", "archive"):
             d = os.path.join(DATA, kind, sport)
             if os.path.isdir(d):
@@ -1081,6 +1350,13 @@ def main():
                 if s != cur:
                     state["done"].setdefault(sp, []).append(s)
 
+    if not args.odds_only:
+        for sp, fn in (("NFL", nfl_metrics), ("NFL", nfl_injuries), ("NBA", nba_metrics), ("NCAAF", cfb_metrics), ("NCAAB", cbb_metrics)):
+            if sp in sports and (sp not in ("NCAAF", "NCAAB") or CFBD_KEY):
+                guard(f"{sp} {fn.__name__}", fn)
+        for sp in ("NFL", "NCAAF"):
+            if sp in sports:
+                guard(f"{sp} model", lambda sp=sp: model_predictions(sp))
     for sp in [x for x in splits_plan(morning=not args.odds_only) if x in sports or args.odds_only]:
         guard(f"{sp} public betting", lambda sp=sp: pull_splits(sp))
     save("state.json", state, pretty=True)
