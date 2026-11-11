@@ -1197,6 +1197,49 @@ def _team_games_cfb(y, order_of):
             if x["pass"] == 1: a["pplays"] += 1; a["pepa"] += x["EPA"]
     return list(agg.values())
 
+def model_predictions_cbb():
+    import model as M, model_cbb as CB
+    import pyarrow.parquet as pq
+    params = load("static/model_params.json", None)
+    if not params or "NCAAB" not in params["sports"]: return
+    P = params["sports"]["NCAAB"]; y = season_of("NCAAB", TODAY)
+    games = {}
+    for s in (y - 1, y):
+        for x in load(f"api/NCAAB/{s}.json", {"games": []})["games"]:
+            gid = str(x["id"])
+            games[gid] = dict(game=gid, season=s, order=x["date"], home=x["home"], away=x["away"], hs=x.get("hs"), sp=x.get("sp"), tot=x.get("tot"), neu=bool(x.get("neu")), conf=bool(x.get("div")))
+            games[gid]["as"] = x.get("as")
+    last = {}
+    for g in sorted(games.values(), key=lambda g: g["order"]):
+        d = date(g["order"] // 10000, g["order"] // 100 % 100, g["order"] % 100)
+        for side, t in (("rest_h", g["home"]), ("rest_a", g["away"])):
+            L = last.get((g["season"], t)); g[side] = (d - L).days if L else 7; last[(g["season"], t)] = d
+    cols = ["game_id", "game_date", "team_score", "field_goals_made", "field_goals_attempted", "three_point_field_goals_made", "free_throws_attempted", "offensive_rebounds", "defensive_rebounds", "turnovers"]
+    box = []
+    for es in (y, y + 1):   # ESPN labels college basketball seasons by their ending year
+        path = os.path.join(ROOT, f".mbb_box_{es}.parquet")
+        try:
+            urllib.request.urlretrieve(f"https://raw.githubusercontent.com/sportsdataverse/hoopR-mbb-data/main/mbb/team_box/parquet/team_box_{es}.parquet", path)
+            box += pq.read_table(path, columns=cols).to_pylist()
+        finally:
+            if os.path.exists(path): os.remove(path)
+    lines = CB.team_lines(games, CB.match_box(games, box))
+    feats, cur = CB.asof(lines)
+    gbs = {}
+    for g in games.values(): gbs.setdefault(g["season"], []).append(g)
+    M.CFG["NCAAB"] = {"cap": 30, "lam": 6, "prior": 0.6, "hfa": 3.2, "K": 300}
+    rm = CB.weekly_ratings(gbs, M.srs, M.CFG["NCAAB"])
+    out = {}; today = int(TODAY.strftime("%Y%m%d"))
+    for g in games.values():
+        if g["season"] != y or g.get("hs") is not None or g["order"] < today or g.get("sp") is None or g.get("tot") is None: continue
+        fh, fa = cur.get((y, g["home"])), cur.get((y, g["away"]))
+        if not fh or not fa or g["game"] not in rm: continue
+        x = CB.features(g, fh, fa, rm[g["game"]])
+        ats = M.predict(P, x, "ats"); tot = M.predict(P, x, "tot") - P["tot"]["intercept"]
+        out[f"{g['order']}|{g['home']}|{g['away']}"] = {"ats": round(ats, 2), "tot": round(tot, 2), "sp": g["sp"], "line_tot": g["tot"], "thin": int(fh["n"] < 4 or fa["n"] < 4 or g.get("neu"))}
+    save("model/NCAAB.json", {"updated": NOW.isoformat(timespec="seconds"), "season": y, "tested": P["tested"], "record": P["record"], "lean": P["lean"], "games": out})
+    say(f"  NCAAB model: predictions for {len(out)} upcoming games")
+
 def model_predictions(sport):
     import model as M
     params = load("static/model_params.json", None)
@@ -1357,6 +1400,8 @@ def main():
         for sp in ("NFL", "NCAAF"):
             if sp in sports:
                 guard(f"{sp} model", lambda sp=sp: model_predictions(sp))
+        if "NCAAB" in sports:
+            guard("NCAAB model", model_predictions_cbb)
     for sp in [x for x in splits_plan(morning=not args.odds_only) if x in sports or args.odds_only]:
         guard(f"{sp} public betting", lambda sp=sp: pull_splits(sp))
     save("state.json", state, pretty=True)
