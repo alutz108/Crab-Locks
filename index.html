@@ -1800,10 +1800,11 @@ async function renderPicks(){
   host.innerHTML = '<div class="empty">Running the systems…</div>';
   const top = pickSport === 'TOP';
   const list = top ? TOP10.map(id => PICKS.find(p => p.id === id)).filter(Boolean) : PICKS.filter(p => p.sport === pickSport);
-  for (const s of [...new Set(list.map(p => p.sport))]) await ensureSport(s);
+  for (const s of [...new Set(list.map(p => p.sport))]){ await ensureSport(s); await tick(); }
   const seasonsOf = sp => [...new Set((data.rows[sp] || []).map(r => r.g.season))].sort((a,b) => a-b);
   const rngS = (sp, arr) => arr.length ? (arr.length === 1 ? seasonLabel(sp, +arr[0]) : `${seasonLabel(sp, +arr[0])} to ${seasonLabel(sp, +arr[arr.length-1])}`) : '';
   let lastTier = null, rank = 0;
+  if (top){ for (const s of ['NFL','NCAAF','NBA','NCAAB']){ await ensureSport(s); systemHits(s); await tick(); } }
   let html = (top ? crabScaleBox(['NFL','NCAAF','NBA','NCAAB']) : '') + (top ? `<div class="note" style="margin:0">The 10 systems with the best evidence: strong on both the seasons they were found on and later seasons they never saw, profitable in most individual seasons, big enough samples, and a sensible reason to work. Only #1 clearly beat what shuffled, no-edge data produced in the full audit; treat the rest as the best of the rest, not sure things.</div>` : '') + list.map(p => {
     rank++;
     const seasons = seasonsOf(p.sport), rng = arr => rngS(p.sport, arr);
@@ -1885,7 +1886,7 @@ $('#logGo').addEventListener('click', async () => {
 function gradeBet(b){
   const rows = data.rows[b.sport];
   const tot = b.bet === 'over' || b.bet === 'under';
-  const r = rows ? rows.find(x => x.g.k === b.k && (tot || x.team === b.side)) : null;
+  const r = rows ? gameRows(b.sport, b.k).find(x => tot || x.team === b.side) : null;
   let hs, as;
   if (r && r.done){ hs = r.g.hs; as = r.g.as; }
   else if (b.final && isNum(b.final.hs) && isNum(b.final.as)){ hs = b.final.hs; as = b.final.as; }
@@ -2008,7 +2009,7 @@ $('#betsBody').addEventListener('click', async e => {
 
 /* ---------- Today's board ---------- */
 function publicTag(p){
-  const r = (data.rows[p.sport] || []).find(x => x.g.k === p.k && (p.bet === 'over' || p.bet === 'under' || x.team === p.side));
+  const r = gameRows(p.sport, p.k).find(x => p.bet === 'over' || p.bet === 'under' || x.team === p.side);
   if (!r) return '';
   if (p.bet === 'over' || p.bet === 'under'){ if (!isNum(r.g.ob)) return ''; const v = p.bet === 'over' ? r.g.ob : 100 - r.g.ob; return ` · ${Math.round(v)}% of bets on the ${p.bet}`; }
   return isNum(r.bets) ? ` · ${Math.round(r.bets)}% of bets on ${esc(p.side)}` : '';
@@ -2024,7 +2025,7 @@ async function renderBoard(){
   const end = addDays(TODAY, boardDays);
   const items = new Map();
   for (const sport of [...new Set(sources.map(s => s.sport))]){
-    await ensureSport(sport);
+    await ensureSport(sport); await tick();
     for (const s of sources.filter(x => x.sport === sport)){
       const f = JSON.parse(JSON.stringify(s.f || {})); migrateFor(f, sport);
       const res = evaluate({ sport, bet: s.bet, fade: !!s.fade, hideDup: !!s.hideDup, f });
@@ -2063,7 +2064,7 @@ $('#boardPicks').addEventListener('change', renderBoard);
 $('#boardExp').addEventListener('change', renderBoard);
 
 /* ---------- app version, refresh and update checks ---------- */
-const APP_VERSION = '2026.11.10-2';
+const APP_VERSION = '2026.11.11-1';
 function hardRefresh(){ location.replace(location.pathname + '?v=' + Date.now()); }
 function fmtUpdated(iso){
   const d = new Date(iso); if (isNaN(d)) return '';
@@ -2286,17 +2287,26 @@ function teamStats(sport, team, season, before){
   o.last = list.slice(-5).map(r => r.mg > 0 ? 'W' : r.mg < 0 ? 'L' : 'T').join('');
   return o;
 }
+const kIndexCache = new Map();
+function gameRows(sport, k){
+  const rows = data.rows[sport] || []; let c = kIndexCache.get(sport);
+  if (!c || c.rows !== rows){ const m = new Map(); for (const r of rows){ const a = m.get(r.g.k); if (a) a.push(r); else m.set(r.g.k, [r]); } c = { rows, m }; kIndexCache.set(sport, c); }
+  return c.m.get(k) || [];
+}
+const gameOf = (sport, k) => (gameRows(sport, k)[0] || {}).g;
+const tick = () => new Promise(r => setTimeout(r, 0));
 const hitsCache = new Map();
 function systemHits(sport){
   const rows = data.rows[sport] || []; const key = systems.map(s => s.id + (s.saved || '')).join(',');
   const c = hitsCache.get(sport); if (c && c.rows === rows && c.key === key) return c.map;
   const map = new Map();
+  const curSeason = rows.reduce((m, r) => r.g.season > m ? r.g.season : m, 0);
   const sources = systems.filter(s => s.sport === sport).map(s => ({ ...s, kind:'mine' })).concat(PICKS.filter(p => p.sport === sport).map(p => ({ ...p, kind:'pick' })));
   for (const s of sources){
     const f = JSON.parse(JSON.stringify(s.f || {})); migrateFor(f, sport);
     const res = evaluate({ sport, bet: s.bet, fade: !!s.fade, hideDup: !!s.hideDup, f });
     const g = grade(res), eff = effBet(s.bet, !!s.fade);
-    for (const b of res.upcoming.concat(res.bets)){
+    for (const b of res.upcoming.concat(res.bets.filter(x => x.r.g.season === curSeason))){
       const p = pickFrom(b, sport, eff, [s.name]);
       const tested = s.kind === 'pick' ? ({ strong:3, held:2, watch:1, exp:0.5 })[s.tier] ?? 0.5 : ({ A:2, B:1.5, C:1 })[g] ?? 0.5;
       if (!map.has(b.r.g.k)) map.set(b.r.g.k, []);
@@ -2328,7 +2338,7 @@ function crabScore(sport, k, ctx = {}){
     const plus = Math.min(2, agree.length); if (plus) { s += plus; why.push([`${agree.length} more tested system${agree.length === 1 ? '' : 's'} agree${agree.length === 1 ? 's' : ''}: ${agree.slice(0, 3).map(h => h.name).join(', ')}`, plus]); }
     const rival = [...sides.entries()].filter(([oid, x]) => oid !== id && oid.split('|')[0] === id.split('|')[0]).flatMap(([, x]) => x.list).filter(h => h.weight >= 1);
     if (rival.length){ s -= 2; why.push([`Tested system on the other side: ${rival.slice(0, 2).map(h => h.name).join(', ')}`, -2]); }
-    const g = (data.rows[sport] || []).find(r => r.g.k === k)?.g;
+    const g = gameOf(sport, k);
     if (ctx.I && g){
       const teams = fam(o.p) === 'tot' ? [g.home, g.away] : [o.p.side];
       const q = teams.flatMap(tm => ((ctx.I.teams || {})[tm] || []).filter(p => p.pos === 'QB' && /out|doubt|question/i.test(p.status)).map(p => `${tm} QB ${p.name} ${p.status.toLowerCase()}`));
@@ -2358,12 +2368,12 @@ function crabRecord(sports){
   for (const sp of sports){
     const map = systemHits(sp);
     for (const [k, hits] of map){
-      const g = (data.rows[sp] || []).find(r => r.g.k === k)?.g; if (!g || g.date < CRAB_START || !isNum(g.hs)) continue;
+      const g = gameOf(sp, k); if (!g || g.date < CRAB_START || !isNum(g.hs)) continue;
       const sc = crabScore(sp, k); if (!sc.length) continue;
       const b = sc[0]; if (b.rival) continue;
       const hit = hits.find(h => h.p.side === b.p.side && h.res); if (!hit) continue;
       const t = tally[b.crabs]; if (hit.res === 'W') t[0]++; else if (hit.res === 'L') t[1]++; else t[2]++;
-      const bb = (data.rows[sp] || []).find(r => r.g.k === k); t[3] += hit.res === 'W' ? (hit.p.odds < 0 ? 100 / -hit.p.odds : hit.p.odds / 100) : hit.res === 'L' ? -1 : 0;
+      t[3] += hit.res === 'W' ? (hit.p.odds < 0 ? 100 / -hit.p.odds : hit.p.odds / 100) : hit.res === 'L' ? -1 : 0;
     }
   }
   return tally;
@@ -2384,7 +2394,7 @@ async function renderGames(){
   const start = gamesDays === 1 ? addDays(TODAY, 1) : TODAY, end = addDays(TODAY, gamesDays);
   const items = [];
   for (const sp of sports){
-    await ensureSport(sp);
+    await ensureSport(sp); await tick();
     const rows = (data.rows[sp] || []).filter(r => r.H && !r.done && r.g.date >= start && r.g.date <= end);
     if (!rows.length) continue;
     const RT = seasonRatings(sp);
@@ -2510,7 +2520,7 @@ function metricLine(sport, M, g){
 }
 async function openGame(sport, k){
   await ensureSport(sport);
-  const rows = (data.rows[sport] || []).filter(r => r.g.k === k); if (!rows.length) return;
+  const rows = gameRows(sport, k); if (!rows.length) return;
   const g = rows[0].g, H = rows.find(r => r.H) || rows[0], A = rows.find(r => !r.H) || rows[1];
   $('#gameTitle').textContent = `${g.away} @ ${g.home}`;
   const mv = (o, c, invert) => { if (!isNum(o) || !isNum(c) || o === c) return ''; const d = +(c - o).toFixed(1); return ` <span class="${(d > 0) !== !!invert ? 'mv-up' : 'mv-dn'}">${d > 0 ? '▲' : '▼'} ${Math.abs(d)}</span>`; };
