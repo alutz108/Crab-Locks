@@ -253,6 +253,18 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
 .pick-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .tbtn.pickbtn{border-color:var(--crab)}
 .m-show{display:none}
+[data-guide]{cursor:pointer}
+[data-guide]:hover{text-decoration:underline;text-underline-offset:2px}
+#guideQ{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 12px;background:var(--surface-2)}
+.gentry{border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.gentry summary{list-style:none;cursor:pointer;padding:10px 12px;font-weight:600;display:flex;justify-content:space-between;gap:10px}
+.gentry summary::-webkit-details-marker{display:none}
+.gentry summary::after{content:"+";color:var(--muted)}
+.gentry[open] summary::after{content:"–"}
+.gentry .gb{padding:0 12px 12px;font-size:14px;display:grid;gap:6px}
+.gentry .gb p{margin:0}
+.gsec{font-family:var(--fd);font-size:19px;font-weight:700;margin:8px 0 0}
+.gentry.hit{border-color:var(--accent-fill);box-shadow:0 0 0 2px var(--accent-fill) inset}
 .crabs{font-size:16px;letter-spacing:1px;line-height:1.2}
 .gcard{border:1px solid var(--line);border-radius:10px;padding:11px 12px;display:grid;gap:6px;background:var(--surface)}
 .gcard .mu{font-family:var(--fd);font-size:20px;font-weight:700;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
@@ -280,7 +292,7 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
 .sync .dot.off{background:var(--muted)}
 .upd{display:block;font-family:var(--fb);font-weight:400;font-size:11px;color:var(--navy-sub);letter-spacing:0;margin-top:-2px}
 @media (min-width:641px) and (max-width:1500px){.upd{display:none}}
-@media (min-width:641px) and (max-width:1400px){.mid-hide{display:none}.top select{max-width:150px}.brand{font-size:24px}}
+@media (min-width:641px) and (max-width:1400px){.mid-hide{display:none}.top select{max-width:130px}.brand{font-size:22px}#accountLabel{display:none}.top-in{gap:6px}.tbtn{padding-left:10px;padding-right:10px}.seg button{padding-left:9px;padding-right:9px}}
 .updfoot{font-size:12px;color:var(--muted);margin-top:4px}
 .brand{flex-wrap:wrap}
 .iconbtn{display:inline-flex;align-items:center;gap:6px}
@@ -328,7 +340,11 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
   dialog.view [data-close]{display:none}
   .toast{bottom:calc(76px + env(safe-area-inset-bottom,0px))}
   .top-in{grid-template-columns:repeat(20,minmax(0,1fr))}
-  .brand{grid-column:1 / span 11}
+  .brand{grid-column:1 / span 9}
+  #guideBtn{grid-column:10 / span 2;grid-row:1;justify-content:center}
+  #guideBtn .mid-hide{display:none}
+  #guideBtn svg{width:20px;height:20px}
+  #guideBtn{padding-left:4px;padding-right:4px}
   #refreshBtn{grid-column:12 / span 3;grid-row:1;justify-content:center}
   #accountBtn{grid-column:15 / span 6;grid-row:1;justify-content:center;overflow:hidden}
   #accountLabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70px}
@@ -379,7 +395,7 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
   .sysname{font-size:23px !important}
   .top{position:static}
   .top-in{display:grid;grid-template-columns:repeat(20,minmax(0,1fr));gap:7px;padding:10px 12px}
-  .brand{grid-column:1 / span 10;font-size:23px;margin:0;align-self:center}
+  .brand{grid-column:1 / span 9;grid-row:1;font-size:21px;margin:0;align-self:center;min-width:0}
 
   .brand small{display:none}
 
@@ -435,6 +451,7 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
   <div class="top-in">
     <div class="brand">🦀 Crab Locks <small id="storeStatus"></small><span class="upd" id="updLabel"></span></div>
     <button class="tbtn iconbtn" id="refreshBtn" aria-label="Refresh" title="Refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg></button>
+    <button class="tbtn iconbtn" id="guideBtn" aria-label="Guide" title="Guide: what everything means"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg><span class="mid-hide">Guide</span></button>
     <button class="tbtn iconbtn" id="accountBtn" aria-label="Account" title="Account"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg><span id="accountLabel">Sign in</span></button>
     <select id="sport" aria-label="Sport">
       <option value="NFL">NFL</option>
@@ -454,7 +471,7 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
     <button class="tbtn desk" id="openBets">Bets</button>
     <button class="tbtn" id="newSystem">New</button>
     <button class="tbtn desk" id="openSystems">Systems</button>
-    <button class="tbtn primary" id="saveSystem">Save<span class="m-hide"> system</span></button>
+    <button class="tbtn primary" id="saveSystem">Save<span class="m-hide mid-hide"> system</span></button>
   </div>
 </header>
 <div class="banner" id="updBanner" hidden role="status"><span id="updText"></span><span class="banner-btns"><button class="btn primary" id="updGo">Update</button><button class="lbtn" id="updX">Later</button></span></div>
@@ -480,13 +497,13 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
     <div class="summary" id="sysSummary"></div>
 
     <div class="kpis" aria-live="polite">
-      <div class="kpi" title="Wins-losses-pushes"><span class="k">Record</span><span class="v" id="kRec">0-0-0</span></div>
-      <div class="kpi"><span class="k">Win %</span><span class="v" id="kWin">–</span></div>
-      <div class="kpi" title="Average result against the line, in points"><span class="k">Margin</span><span class="v" id="kMargin">–</span></div>
-      <div class="kpi" title="Profit betting 1 unit per game"><span class="k">Units</span><span class="v" id="kUnits">0.0</span></div>
-      <div class="kpi" title="Profit betting $100 per game"><span class="k">Money won</span><span class="v" id="kMoney">$0</span></div>
-      <div class="kpi"><span class="k">ROI</span><span class="v" id="kRoi">–</span></div>
-      <div class="kpi" title="A: strong and big enough to trust. B: promising. C: slight edge. D: about break-even. F: losing."><span class="k">Grade</span><span class="v grade g-x" id="kGrade">–</span></div>
+      <div class="kpi" title="Wins-losses-pushes"><span class="k" data-guide="record" role="button" tabindex="0">Record ⓘ</span><span class="v" id="kRec">0-0-0</span></div>
+      <div class="kpi"><span class="k" data-guide="winpct" role="button" tabindex="0">Win % ⓘ</span><span class="v" id="kWin">–</span></div>
+      <div class="kpi" title="Average result against the line, in points"><span class="k" data-guide="margin" role="button" tabindex="0">Margin ⓘ</span><span class="v" id="kMargin">–</span></div>
+      <div class="kpi" title="Profit betting 1 unit per game"><span class="k" data-guide="units" role="button" tabindex="0">Units ⓘ</span><span class="v" id="kUnits">0.0</span></div>
+      <div class="kpi" title="Profit betting $100 per game"><span class="k" data-guide="money" role="button" tabindex="0">Money won ⓘ</span><span class="v" id="kMoney">$0</span></div>
+      <div class="kpi"><span class="k" data-guide="roi" role="button" tabindex="0">ROI ⓘ</span><span class="v" id="kRoi">–</span></div>
+      <div class="kpi" title="A: strong and big enough to trust. B: promising. C: slight edge. D: about break-even. F: losing."><span class="k" data-guide="grade" role="button" tabindex="0">Grade ⓘ</span><span class="v grade g-x" id="kGrade">–</span></div>
     </div>
     <div class="risk" id="riskRow"></div>
     <div class="verdict" id="vText"></div>
@@ -586,6 +603,15 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
 <dialog id="dlgBets" aria-labelledby="betsTitle" style="width:min(820px,calc(100vw - 20px))">
   <div class="dlg-h"><h2 id="betsTitle">My bets</h2><button class="lbtn" data-close>Close</button></div>
   <div class="dlg-b" id="betsBody"></div>
+</dialog>
+
+<dialog id="dlgGuide" aria-labelledby="guideTitle" style="width:min(760px,calc(100vw - 20px))">
+  <div class="dlg-h"><h2 id="guideTitle">📖 Guide</h2><button class="lbtn" data-close>Close</button></div>
+  <div class="dlg-b">
+    <input type="search" id="guideQ" placeholder="Search: crabs, ROI, EPA, price limit…" aria-label="Search the guide">
+    <div class="ptabs" id="guideSecs"></div>
+    <div id="guideList" style="display:grid;gap:6px"></div>
+  </div>
 </dialog>
 
 <dialog id="dlgAccount" aria-labelledby="acctTitle" style="width:min(460px,calc(100vw - 20px))">
@@ -1374,7 +1400,7 @@ function renderKPIs(res){
   if (!res.n){ rr.innerHTML = ''; }
   else {
     const chip = (k, v, cls, tip) => `<div class="kpi" title="${tip}"><span class="k">${k}</span><span class="v ${cls || ''}">${v}</span></div>`;
-    rr.innerHTML = `<span class="risk-label">Risk</span>` +
+    rr.innerHTML = `<span class="risk-label" data-guide="risk">Risk ⓘ</span>` +
       chip('Worst skid', `${rk.skid} loss${rk.skid === 1 ? '' : 'es'}`, '', 'Most losses in a row') +
       chip('Max drawdown', money(-rk.dd), rk.dd > 0 ? 'bad' : '', 'Biggest drop from a high point, betting $100 a game') +
       chip(`Last ${rk.recentN} season${rk.recentN === 1 ? '' : 's'}`, `${rk.recentUp} of ${rk.recentN} up`, rk.recentUp === rk.recentN ? 'good' : rk.recentUp === 0 ? 'bad' : '', 'How many of the most recent seasons made money') +
@@ -2235,7 +2261,7 @@ async function renderBoard(){
   for (const it of list){
     if (it.p.date !== day){ day = it.p.date; html += `<div class="dayhead">${day === TODAY ? 'Today, ' : ''}${fmtShort(day)}</div>`; }
     const i = regPick(it.p);
-    html += `<div class="board-item${it.conflict ? ' conflict' : ''}"><div ${gameAttrs(it.p.sport, it.p.k)}><div class="crabs" title="${crabName(it.crabs)}">${crabStr(it.crabs)} <span class="muted" style="font-size:12px;font-weight:600">${crabName(it.crabs)}</span></div><div class="pick">${esc(pickText(it.p))}</div><div class="meta">${SPORT_NAMES[it.p.sport]}: ${esc(it.p.away)} @ ${esc(it.p.home)}${publicTag(it.p)}</div></div>
+    html += `<div class="board-item${it.conflict ? ' conflict' : ''}"><div ${gameAttrs(it.p.sport, it.p.k)}><div class="crabs" data-guide="crab" title="What the crabs mean">${crabStr(it.crabs)} <span class="muted" style="font-size:12px;font-weight:600">${crabName(it.crabs)} ⓘ</span></div><div class="pick">${esc(pickText(it.p))}</div><div class="meta">${SPORT_NAMES[it.p.sport]}: ${esc(it.p.away)} @ ${esc(it.p.home)}${publicTag(it.p)}</div></div>
       <div class="right"><div class="odds">${fmtOdds(it.p.odds)}</div>${logButton(i)}</div>
       <div class="sys">${it.srcs.map(s => `<span class="chip${s.kind === 'pick' ? ' pick-chip' : ''}">${s.kind === 'pick' ? '🦀 ' : ''}${esc(s.name)}<span class="gr">${s.grade === 'x' ? '' : s.grade}</span></span>`).join('')}</div>
       ${(() => { const L = priceLimit(it.p), kn = keyNote(it.p, gameOf(it.p.sport, it.p.k)); return `<div class="sys" style="font-size:13px;color:var(--muted)">${L ? `Price limit: <b>${esc(L.text)}</b>` : ''}${kn ? `<span style="width:100%">${esc(kn)}</span>` : ''}</div>`; })()}
@@ -2248,7 +2274,7 @@ async function oppHtml(start, end){
   let ops = [];
   try{ ops = await opportunities(start, end); }catch(e){}
   if (!ops.length) return '';
-  return `<div class="about" style="display:grid;gap:8px;border-color:var(--accent-fill)"><h4>Opportunities</h4>${ops.map(o => `<div ${gameAttrs(o.sport, o.k)} style="display:grid;gap:2px"><div class="pick" style="font-weight:700">${o.icon} ${esc(o.title)} <span class="muted" style="font-weight:500;font-size:12px">${SPORT_NAMES[o.sport]} · ${fmtShort(o.date)}</span></div><div class="muted" style="font-size:13px">${esc(o.text)}</div></div>`).join('')}
+  return `<div class="about" style="display:grid;gap:8px;border-color:var(--accent-fill)"><h4>Opportunities <span data-guide="opps" class="muted" style="font-size:13px">ⓘ</span></h4>${ops.map(o => `<div ${gameAttrs(o.sport, o.k)} style="display:grid;gap:2px"><div class="pick" style="font-weight:700">${o.icon} ${esc(o.title)} <span class="muted" style="font-weight:500;font-size:12px">${SPORT_NAMES[o.sport]} · ${fmtShort(o.date)}</span></div><div class="muted" style="font-size:13px">${esc(o.text)}</div></div>`).join('')}
     <div class="note" style="margin:0">Spots worth acting on before the market moves. Only wind on NFL totals is a tested edge; the rest are worth a look, then track whether the line moves your way.</div></div>`;
 }
 $('#openBoard').addEventListener('click', () => openView('board'));
@@ -2257,7 +2283,7 @@ $('#boardPicks').addEventListener('change', renderBoard);
 $('#boardExp').addEventListener('change', renderBoard);
 
 /* ---------- app version, refresh and update checks ---------- */
-const APP_VERSION = '2026.11.11-4';
+const APP_VERSION = '2026.11.11-5';
 function hardRefresh(){ location.replace(location.pathname + '?v=' + Date.now()); }
 function fmtUpdated(iso){
   const d = new Date(iso); if (isNaN(d)) return '';
@@ -2391,7 +2417,7 @@ function toastAction(msg, label, fn){
 /* ---------- game detail sheet ---------- */
 function gameAttrs(sport, k){ return `data-gs="${sport}" data-gk="${esc(k)}"`; }
 document.addEventListener('click', e => {
-  if (e.target.closest('button, a, input, label')) return;
+  if (e.target.closest('button, a, input, label, [data-guide]')) return;
   const el = e.target.closest('[data-gk]'); if (el) openGame(el.dataset.gs, el.dataset.gk);
 });
 function lastGames(sport, team, before, n = 5){
@@ -2604,7 +2630,7 @@ async function proofHtml(){
   }
   rowsOut.sort((a, b) => b.n - a.n);
   const fmtC = (v, n) => isNum(v) ? `<span class="${v > 0 ? 'W' : v < 0 ? 'L' : ''}">${v > 0 ? '+' : ''}${v.toFixed(2)}</span> <span class="muted">(${n})</span>` : '–';
-  return `<div class="about" style="display:grid;gap:6px"><h4>Proof dashboard</h4>
+  return `<div class="about" style="display:grid;gap:6px"><h4>Proof dashboard <span data-guide="proof" class="muted" style="font-size:13px">ⓘ</span></h4>
     <p>Live results for every Crab Pick and your saved systems since ${fmtDate(CRAB_START)}, graded automatically. Two ways to judge them:</p>
     <p style="margin:0">• <b>Record</b>: wins and losses. Proving a real 55% system this way takes about 1,400 bets.<br>• <b>Line movement</b>: whether the line moved toward the pick between open and close (points). Consistently positive usually means a real edge, and it shows up in about 150–300 bets.</p>
     <p class="note" style="margin:0">Verdicts start after 30 decided bets. <b>Proving out</b>: line movement averages +0.3 or better, or the record is clearly above break-even. <b>Not working</b>: both clearly negative. Otherwise <b>Inconclusive</b>. Your own logged bets show how your actual numbers compared with the close.</p></div>
@@ -2613,7 +2639,7 @@ async function proofHtml(){
 function crabScaleBox(sports){
   const T = crabRecord(sports);
   const row = n => { const t = T[n], d = t[0] + t[1]; return `<tr><td>${crabStr(n)} <span class="muted">${crabName(n)}</span></td><td class="num">${d + t[2] ? `${t[0]}-${t[1]}${t[2] ? '-' + t[2] : ''}` : '–'}</td><td class="num">${d ? (t[0] / d * 100).toFixed(0) + '%' : '–'}</td><td class="num">${CRAB_BACKTEST[n] ? `${CRAB_BACKTEST[n].rec} (${CRAB_BACKTEST[n].pct}%)` : n === 5 ? 'none yet' : '–'}</td></tr>`; };
-  return `<div class="about" style="display:grid;gap:6px"><h4>The Crab scale</h4>
+  return `<div class="about" style="display:grid;gap:6px"><h4>The Crab scale <span data-guide="crab" class="muted" style="font-size:13px">ⓘ</span></h4>
     <p>Each lean gets 1–5 🦀 from the evidence behind it: how strong the best system is, how many tested systems agree, whether any are on the other side, quarterback news (NFL), and whether the Crab Locks model agrees. 🦀🦀🦀🦀🦀 is a <b>Crab Lock</b>: the strongest evidence Crab Locks has, rare, and still not a sure thing.</p>
     <div class="tscroll"><table class="data"><thead><tr><th>Rating</th><th class="num">Live record</th><th class="num">Win %</th><th class="num">Backtest</th></tr></thead><tbody>${[5,4,3,2,1].map(row).join('')}</tbody></table></div>
     <p class="note" style="margin:0">Live record counts every rated pick on games since Nov 10, 2026, graded automatically. The backtest is generous, because the systems were chosen partly on those seasons; the live record is the honest test.</p></div>`;
@@ -2770,7 +2796,7 @@ async function openGame(sport, k){
     const sp = k => B[k] ? cell(`${fmtLine(B[k][0])}${isNum(B[k][1]) ? ` (${fmtOdds(B[k][1])})` : ''}`, B[k][2] ?? B[k][1]) : '–';
     const tt = k => B[k] ? cell(`${B[k][0]}${isNum(B[k][1]) && B[k].length > 2 ? ` (${fmtOdds(B[k][1])})` : ''}`, B[k][2] ?? B[k][1]) : '–';
     const ml = k => B[k] ? cell(fmtOdds(B[k][0]), B[k][1]) : '–';
-    html += `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Best available lines</h4><div class="gline" style="grid-template-columns:minmax(0,1fr) repeat(2,minmax(0,1.3fr))">
+    html += `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Best available lines <span data-guide="best" class="muted" style="font-size:13px">ⓘ</span></h4><div class="gline" style="grid-template-columns:minmax(0,1fr) repeat(2,minmax(0,1.3fr))">
       <div class="h">Market</div><div class="h">${esc(g.away)}</div><div class="h">${esc(g.home)}</div>
       <div class="t">Spread</div><div>${sp('sp_away')}</div><div>${sp('sp_home')}</div>
       <div class="t">Moneyline</div><div>${ml('ml_away')}</div><div>${ml('ml_home')}</div>
@@ -2798,7 +2824,7 @@ async function openGame(sport, k){
   const MD = (sport === 'NFL' || sport === 'NCAAF' || sport === 'NCAAB') ? await loadModel(sport) : null, ML = modelLine(MD, g);
   if (ML){
     const se = +(ML.ats).toFixed(1), te = +(ML.dtot).toFixed(1);
-    html += `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Crab Locks model</h4>
+    html += `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Crab Locks model <span data-guide="model" class="muted" style="font-size:13px">ⓘ</span></h4>
       <div class="proj"><div class="pstat"><div class="k">Model spread</div><div class="v">${esc(g.home)} ${fmtLine(ML.sp)}</div><div class="s">Market ${esc(g.home)} ${fmtLine(g.sp)} · ${Math.abs(se) < 0.5 ? 'agrees with the market' : `likes ${esc(se > 0 ? g.home : g.away)} by ${Math.abs(se)}`}</div><div class="s">${esc(modelRecordText(MD, 'ats', se))}</div></div>
       <div class="pstat"><div class="k">Model total</div><div class="v">${ML.tot}</div><div class="s">Market ${isNum(g.tot) ? g.tot : '–'} · ${Math.abs(te) < 0.5 ? 'agrees with the market' : `${Math.abs(te)} ${te > 0 ? 'higher' : 'lower'}`}</div><div class="s">${esc(modelRecordText(MD, 'tot', te))}</div></div></div>
       <div class="note" style="margin-top:-4px">${sport === 'NCAAB' ? 'Uses possession-based efficiency adjusted for opponent and home court, pace, the four factors, last 5 games, score-based ratings, rest and conference games' : `Uses play-by-play efficiency (EPA, success rate, passing matchups, last 4 games), score-based ratings, rest, home field, ${sport === 'NFL' ? 'division games and weather' : 'and conference games'}`}, all as of game day, and starts from the market line. In walk-forward testing it never cleared the bar for a lean, so it’s shown for context: when it disagrees, check the news for why.${MD.games[g.date + '|' + g.home + '|' + g.away]?.thin ? ' <b>Limited data:</b> early season or a neutral site, so this projection is less reliable than usual.' : ''}</div>`;
@@ -2834,7 +2860,7 @@ async function openGame(sport, k){
     ${rowC('Streak', isNum(A.strk) && A.strk ? (A.strk > 0 ? 'W' + A.strk : 'L' + -A.strk) : '–', isNum(H.strk) && H.strk ? (H.strk > 0 ? 'W' + H.strk : 'L' + -H.strk) : '–')}
   </div><div class="note" style="margin-top:-4px">Offense and defense are points above or below an average team, adjusted for opponents. For defense, lower is better. Green marks the better side.</div>`;
   // advanced metrics (filled in after the sheet opens)
-  html += `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Advanced metrics</h4><div id="gameAdv"><div class="muted">Loading…</div></div>`;
+  html += `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Advanced metrics <span data-guide="metrics" class="muted" style="font-size:13px">ⓘ</span></h4><div id="gameAdv"><div class="muted">Loading…</div></div>`;
   html += `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Injuries</h4><div id="gameInj"><div class="muted">Loading…</div></div>`;
   // head-to-head
   const h2h = (data.rows[sport] || []).filter(r => r.team === H.team && r.opp === A.team && r.done && r.g.date < g.date).sort((a, b) => b.g.date - a.g.date).slice(0, 5);
@@ -3038,6 +3064,28 @@ function renderAccount(){
   $('#acctReset').onclick = () => run(() => { const [e] = val(); if (!e) throw { message:'Type your email above first.' }; return cloud.auth.sendPasswordResetEmail(e); }, 'Check your email for a reset link.');
 }
 $('#accountBtn').addEventListener('click', () => { renderAccount(); $('#dlgAccount').showModal(); });
+
+/* ---------- Guide ---------- */
+const GUIDE = [{"sec": "Ratings & confidence", "id": "crab", "term": "Crab scale (1–5 🦀)", "html": "How much evidence is behind a lean. It starts from the strongest system on that side (strongest evidence 3, held up in testing 2, watch list 1, experimental ½; your own systems by grade: A 2, B 1.5, C 1), adds 1 for each other tested system agreeing (up to +2), subtracts 2 if a tested system is on the other side, subtracts 1 for quarterback uncertainty (NFL), and adds or subtracts ½ when the Crab Locks model clearly agrees or disagrees. 5 = <b>Crab Lock</b>, 4 = Strong, 3 = Solid, 2 = Lean, 1 = Slight.<p>A Crab Lock is the strongest evidence the app has, not a sure thing. The live record by crab level is in Crab Picks → Top 10.</p>"}, {"sec": "Ratings & confidence", "id": "crablock", "term": "Crab Lock", "html": "A 5-crab lean: the strongest-evidence system plus at least two more tested systems on the same side, with nothing against it. Rare by design. Even the best systems lose about 4 bets in 10."}, {"sec": "Ratings & confidence", "id": "split", "term": "Systems split", "html": "Tested systems are on opposite sides of the same game. Historically those picks did worse than a coin flip (about 44%), so the usual move is to pass."}, {"sec": "Ratings & confidence", "id": "grade", "term": "Grade (A–F)", "html": "How far a system’s results beat break-even, adjusted for sample size. <b>A</b>: 2.5+ standard deviations above break-even with 100+ bets. <b>B</b>: 1.5+. <b>C</b>: 0.5+. <b>D</b>: about break-even. <b>F</b>: losing. A dash means fewer than 30 decided bets, too few to grade."}, {"sec": "Ratings & confidence", "id": "tiers", "term": "Pick tiers", "html": "<b>Strongest evidence</b>: beat what shuffled, no-edge data produces in the full audit (only NFL windy unders so far). <b>Held up in testing</b>: made money both where it was found and on later seasons it never saw. <b>Watch list</b>: positive but thinner or less consistent. <b>Experimental</b>: passed a C grade on both, but luck produces about as many like it."}, {"sec": "Ratings & confidence", "id": "foundtested", "term": "Found on / Tested on", "html": "Every Crab Pick was found using older seasons only, then checked on later seasons it never saw. The <b>tested-on</b> result is the honest one, because the system couldn’t have been fit to those games."}, {"sec": "Ratings & confidence", "id": "luck", "term": "Shuffled-data luck check", "html": "The same search run on data where no real edge exists (results randomized). If real data produces about as many “good” systems as the shuffled data, most of them are luck. This is why most systems are labeled experimental."}, {"sec": "Ratings & confidence", "id": "zscore", "term": "Standard deviations above break-even", "html": "How unusual a system’s record is if it really had no edge. About 1 is common by luck; 2 happens by luck roughly 1 time in 40; 2.5+ is rare. Testing thousands of systems makes some 2s appear by chance, which is why tested-on results matter more."}, {"sec": "Ratings & confidence", "id": "proof", "term": "Proof dashboard verdicts", "html": "Live results since Nov 10, 2026 for every Crab Pick and your saved systems. After 30 decided bets: <b>Proving out</b> when the line moved toward the pick by +0.3 points on average, or the record is clearly above break-even; <b>Not working</b> when both are clearly negative; otherwise <b>Inconclusive</b>. Before 30, <b>Too early</b>."}, {"sec": "Results & stats", "id": "record", "term": "Record (W-L-P)", "html": "Wins, losses and pushes. A push is a tie against the spread or total; your stake comes back."}, {"sec": "Results & stats", "id": "winpct", "term": "Win %", "html": "Wins divided by wins plus losses (pushes left out). At −110 you need <b>52.4%</b> to break even. For moneyline underdog systems, win % is misleading; look at ROI instead."}, {"sec": "Results & stats", "id": "margin", "term": "Margin", "html": "How many points the bets won or lost by against the line, on average. +1.5 means the system’s side beat the spread by 1.5 points per game."}, {"sec": "Results & stats", "id": "units", "term": "Units", "html": "Profit measured in bets. Every bet risks 1 unit; a win at −110 pays 0.91 units, a loss costs 1. +12.4 units means up 12.4 times your bet size."}, {"sec": "Results & stats", "id": "money", "term": "Money won", "html": "Units at $100 per bet. +12.4 units = +$1,240."}, {"sec": "Results & stats", "id": "roi", "term": "ROI", "html": "Profit divided by total amount risked. 200 bets at $100 = $20,000 risked; $1,240 profit = 6.2% ROI. Pushes count as bets risked with $0 profit."}, {"sec": "Results & stats", "id": "breakeven", "term": "Break-even", "html": "The win rate needed to not lose money at the prices bet. 52.4% at −110; lower for underdogs at plus money, higher for favorites."}, {"sec": "Results & stats", "id": "risk", "term": "Risk numbers", "html": "<b>Worst skid</b>: most losses in a row. <b>Max drawdown</b>: biggest drop from a high point at $100 a bet. <b>Last 3 seasons</b>: how many made money. <b>Worst season</b>: the least profitable one. A system up $3,000 that once lost $2,500 in a month feels very different to bet."}, {"sec": "Building systems", "id": "fade", "term": "Fade system", "html": "Bet the other side of every game the filters pick. Use it to test betting against something (like the public’s favorite team)."}, {"sec": "Building systems", "id": "hidedup", "term": "Hide duplicates", "html": "Drops games where both teams match the filters, since betting both sides cancels out."}, {"sec": "Building systems", "id": "defaultprice", "term": "Default price", "html": "The juice assumed when the data doesn’t have the actual price (usually −110)."}, {"sec": "Building systems", "id": "upcoming", "term": "Upcoming matches", "html": "Games coming up that fit the system. Only shown when it’s each team’s very next game, so filters like “last game” are already known. The season filter is ignored here: it picks which history to test, not which games to bet."}, {"sec": "Building systems", "id": "filters", "term": "Travel, rest & schedule filters", "html": "<b>Travel</b>: miles since the last game. <b>Time zones crossed</b>: + means traveled east. <b>Altitude</b>: visiting Denver or Salt Lake City. <b>Schedule spot</b>: off a bye, short week, 3rd game in 4 nights, back-to-back after travel. <b>Revenge</b>: lost the last meeting. <b>Letdown</b>: last game was an upset win as a 3+ point underdog. <b>Look-ahead</b>: next game (within 9 days) is against a strong team; only games scheduled in advance count."}, {"sec": "Building systems", "id": "pubfilters", "term": "Public betting filters", "html": "<b>% of bets</b>: share of tickets on a team. <b>% of money</b>: share of dollars. When money runs well ahead of bets, fewer, bigger bettors are on that side, often read as sharp money. Collected daily since Nov 9, 2026, plus anything you import."}, {"sec": "Lines & prices", "id": "openclose", "term": "Opening and closing lines", "html": "The opener is the first line posted; the closer is the last line before the game. Closing lines are the market’s best estimate, so most testing uses them."}, {"sec": "Lines & prices", "id": "movement", "term": "Line movement (▲▼)", "html": "How far a line moved since it opened. On a spread, ▼ means it moved toward that team (more money on them). On a total, ▲ means it went up."}, {"sec": "Lines & prices", "id": "best", "term": "Best available lines", "html": "The best number and price across sportsbooks at the last update (line shopping). Half a point or 10 cents of juice on every bet can decide whether a season is a winner."}, {"sec": "Lines & prices", "id": "limit", "term": "Price limit", "html": "The worst number worth betting for a lean: half a point worse than today’s market at most, and never giving up a 3 or a 7, at −115 or better. Systems were tested at market prices, so a worse number gives the edge away. Log bet asks you to confirm if you go past it."}, {"sec": "Lines & prices", "id": "keynum", "term": "Key numbers (🔑)", "html": "In football, games land on margins of 3 and 7 far more than other numbers. Getting +3.5 instead of +3, or −2.5 instead of −3, is worth much more than an ordinary half point."}, {"sec": "Lines & prices", "id": "clv", "term": "Beat the close", "html": "Whether the number you got was better than the closing line. Consistently beating the close predicts long-run profit far better than a few weeks of wins and losses, and shows up in 150–300 bets instead of 1,000+."}, {"sec": "Lines & prices", "id": "reversed", "term": "⚠ Reversed spread", "html": "About 1 in 100 college football games and 1 in 500 college basketball games had the spread recorded from the wrong team’s side. Those games are left out of spread and moneyline results (totals are unaffected) and flagged on the game sheet."}, {"sec": "Game breakdown", "id": "lean", "term": "Leans", "html": "A lean only appears when tested systems back a side: Crab Picks plus your saved systems with good grades. The breakdown lists exactly how the crab score was built."}, {"sec": "Game breakdown", "id": "model", "term": "Crab Locks model", "html": "NFL, college football and college basketball projections built from play-by-play or possession efficiency, ratings, rest, home field and more, all as of game day, starting from the market line. In testing they didn’t beat the closing line, so they’re shown as context, with their test record next to them."}, {"sec": "Game breakdown", "id": "ratingsproj", "term": "Ratings-only projection", "html": "A simpler projection from this season’s scores, adjusted for opponents and home field, with last season as a starting point. Win chance comes from the projected margin."}, {"sec": "Game breakdown", "id": "spline", "term": "SP+ line / Efficiency line", "html": "Second projections from advanced ratings: SP+ for college football, adjusted efficiency for basketball. Not backtested yet."}, {"sec": "Game breakdown", "id": "power", "term": "Power rating", "html": "Points better or worse than an average team on a neutral field, from this season’s scores and opponents. Rank is among teams that have played this season."}, {"sec": "Game breakdown", "id": "metrics", "term": "Advanced metrics", "html": "<b>EPA</b>: expected points added per play. <b>Success rate</b>: share of plays gaining enough yardage. <b>PPA</b>: college version of EPA. <b>Explosiveness</b>: average value of successful plays. <b>Havoc</b>: share of plays with a tackle for loss, forced fumble or pass defended. <b>Pressure rate</b>: how often the quarterback is pressured. <b>Net/offensive/defensive rating</b>: points per 100 possessions. <b>Pace</b>: possessions per game. <b>Four factors</b>: shooting (eFG%), turnovers, offensive rebounding, free throws."}, {"sec": "Game breakdown", "id": "injuries", "term": "Injuries", "html": "NFL: official weekly reports (Out, Doubtful, Questionable). NBA: ESPN’s live list. College: not available for free. Quarterback news lowers the crab score and appears in the lean reasons."}, {"sec": "Game breakdown", "id": "weather", "term": "Weather", "html": "Open-Meteo forecast for outdoor football games, for kickoff and the next two hours, refreshed each morning. Wind 12+ mph is highlighted; it’s the strongest proven factor in the app."}, {"sec": "Game breakdown", "id": "opps", "term": "Opportunities", "html": "At the top of Today’s board. <b>🌬 Wind alerts</b>: windy forecast, total hasn’t dropped. <b>📈 Early lines</b>: the model disagrees with a line that hasn’t moved since it opened. <b>🔑 Key numbers</b>: one book has the better side of 3 or 7. Only NFL wind is a tested edge."}, {"sec": "Bets & account", "id": "betlog", "term": "Bet log", "html": "Log bets from any game. They grade themselves from live ESPN scores after the game, or the next data update. Bets shows your record, ROI, bankroll chart, results by system, and beat-the-close."}, {"sec": "Bets & account", "id": "sync", "term": "Accounts & sync", "html": "Sign in with the same email on your phone and computer to sync systems, bets and imported public betting numbers. Everything stays private to your account."}, {"sec": "Bets & account", "id": "data", "term": "Data & updates", "html": "GitHub updates the data at 6 AM and 4:30 PM Eastern: lines, scores, openers, public betting, injuries, weather, advanced stats and model projections. Sources: nflverse, CollegeFootballData, CollegeBasketballData, The Odds API, ESPN, Playbook, sportsdataverse and Open-Meteo."}, {"sec": "Bets & account", "id": "import", "term": "Import data", "html": "Add games from a CSV, or public betting numbers from an Action Network JSON export, through the link at the bottom of the filter list. Imported numbers stay private."}];
+let guideSec = 'All';
+function renderGuide(target){
+  const q = ($('#guideQ').value || '').trim().toLowerCase();
+  const secs = ['All', ...new Set(GUIDE.map(g => g.sec))];
+  $('#guideSecs').innerHTML = secs.map(s => `<button data-gsec="${s}" aria-pressed="${s === guideSec}">${s}</button>`).join('');
+  const list = GUIDE.filter(g => (guideSec === 'All' || g.sec === guideSec || target === g.id) && (!q || (g.term + ' ' + g.html.replace(/<[^>]+>/g, '')).toLowerCase().includes(q)));
+  let html = '', sec = null;
+  for (const g of list){
+    if (g.sec !== sec){ sec = g.sec; html += `<div class="gsec">${esc(sec)}</div>`; }
+    html += `<details class="gentry${target === g.id ? ' hit' : ''}" id="g-${g.id}"${target === g.id || q ? ' open' : ''}><summary>${esc(g.term)}</summary><div class="gb"><p>${g.html}</p></div></details>`;
+  }
+  $('#guideList').innerHTML = html || '<div class="empty">Nothing matches. Try another word.</div>';
+  if (target){ const el = document.getElementById('g-' + target); if (el) setTimeout(() => el.scrollIntoView({ block:'center' }), 50); }
+}
+function openGuide(target){ if (target){ guideSec = 'All'; $('#guideQ').value = ''; } $('#dlgGuide').showModal(); renderGuide(target); }
+$('#guideBtn').addEventListener('click', () => openGuide());
+$('#guideQ').addEventListener('input', () => renderGuide());
+$('#guideSecs').addEventListener('click', e => { const b = e.target.closest('[data-gsec]'); if (!b) return; guideSec = b.dataset.gsec; renderGuide(); });
+document.addEventListener('click', e => { const t = e.target.closest('[data-guide]'); if (t){ e.preventDefault(); openGuide(t.dataset.guide); } });
 
 /* ---------- wiring ---------- */
 document.querySelectorAll('dialog [data-close]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
