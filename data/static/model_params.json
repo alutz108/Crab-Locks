@@ -1,0 +1,424 @@
+{
+ "version": "2026-11-10",
+ "note": "Ridge regression on as-of-game-day inputs; predicts cover margin vs the closing spread and points vs the closing total. Trained on all completed seasons. No edge level cleared the bar for leans in walk-forward testing (spreads ~50-54%, totals ~50-55%, all within luck), so the model is shown as context only.",
+ "sports": {
+  "NFL": {
+   "ats": {
+    "features": [
+     "r_edge",
+     "epa_d",
+     "l4_d",
+     "sr_d",
+     "pass_d",
+     "sp",
+     "rest_d",
+     "neu",
+     "conf"
+    ],
+    "coef": [
+     0.15897,
+     -0.15785,
+     -0.22747,
+     0.27689,
+     0.32302,
+     -0.24963,
+     0.23183,
+     0.0498,
+     -0.1409
+    ],
+    "intercept": -0.02884,
+    "mean": [
+     -0.33851,
+     0.00242,
+     0.00296,
+     -0.00013,
+     0.00227,
+     -2.14563,
+     0.0135,
+     0.01595,
+     0.3604
+    ],
+    "std": [
+     3.52971,
+     0.12367,
+     0.22505,
+     0.04947,
+     0.14545,
+     5.99786,
+     2.50135,
+     0.12531,
+     0.48017
+    ]
+   },
+   "tot": {
+    "features": [
+     "tot_epa",
+     "pace",
+     "pts_edge",
+     "tot",
+     "wind",
+     "cold",
+     "dome"
+    ],
+    "coef": [
+     -0.17137,
+     0.29073,
+     -0.40844,
+     -0.66249,
+     -0.98895,
+     0.48912,
+     0.04123
+    ],
+    "intercept": 0.67304,
+    "mean": [
+     0.00215,
+     123.10291,
+     0.59192,
+     44.482,
+     5.69687,
+     0.11863,
+     0.26999
+    ],
+    "std": [
+     0.12752,
+     31.4516,
+     2.80505,
+     4.61905,
+     5.72756,
+     0.32339,
+     0.444
+    ]
+   },
+   "record": {
+    "ats": {
+     "0": {
+      "n": 2748,
+      "w": 1393,
+      "pct": 50.7,
+      "z": -1.77,
+      "seasons_above": 2,
+      "seasons": 11
+     },
+     "0.5": {
+      "n": 1230,
+      "w": 614,
+      "pct": 49.9,
+      "z": -1.73,
+      "seasons_above": 4,
+      "seasons": 11
+     },
+     "1": {
+      "n": 357,
+      "w": 191,
+      "pct": 53.5,
+      "z": 0.42,
+      "seasons_above": 6,
+      "seasons": 11
+     },
+     "1.5": {
+      "n": 91,
+      "w": 44,
+      "pct": 48.4,
+      "z": -0.77,
+      "seasons_above": 4,
+      "seasons": 10
+     },
+     "2": {
+      "n": 19,
+      "w": 11,
+      "pct": 57.9,
+      "z": 0.48,
+      "seasons_above": 3,
+      "seasons": 6
+     },
+     "2.5": {
+      "n": 5,
+      "w": 3,
+      "pct": 60.0,
+      "z": 0.34,
+      "seasons_above": 1,
+      "seasons": 2
+     },
+     "3": {
+      "n": 1,
+      "w": 0,
+      "pct": 0.0,
+      "z": -1.05,
+      "seasons_above": 0,
+      "seasons": 1
+     }
+    },
+    "tot": {
+     "0": {
+      "n": 2796,
+      "w": 1412,
+      "pct": 50.5,
+      "z": -1.99,
+      "seasons_above": 1,
+      "seasons": 11
+     },
+     "0.5": {
+      "n": 2156,
+      "w": 1095,
+      "pct": 50.8,
+      "z": -1.48,
+      "seasons_above": 2,
+      "seasons": 11
+     },
+     "1": {
+      "n": 1480,
+      "w": 760,
+      "pct": 51.4,
+      "z": -0.79,
+      "seasons_above": 5,
+      "seasons": 11
+     },
+     "1.5": {
+      "n": 886,
+      "w": 458,
+      "pct": 51.7,
+      "z": -0.41,
+      "seasons_above": 4,
+      "seasons": 11
+     },
+     "2": {
+      "n": 440,
+      "w": 229,
+      "pct": 52.0,
+      "z": -0.14,
+      "seasons_above": 5,
+      "seasons": 11
+     },
+     "2.5": {
+      "n": 181,
+      "w": 101,
+      "pct": 55.8,
+      "z": 0.92,
+      "seasons_above": 6,
+      "seasons": 11
+     },
+     "3": {
+      "n": 63,
+      "w": 33,
+      "pct": 52.4,
+      "z": 0.0,
+      "seasons_above": 4,
+      "seasons": 10
+     },
+     "4": {
+      "n": 11,
+      "w": 6,
+      "pct": 54.5,
+      "z": 0.14,
+      "seasons_above": 3,
+      "seasons": 6
+     }
+    }
+   },
+   "tested": "2016-2026",
+   "lean": {
+    "ats": null,
+    "tot": null
+   }
+  },
+  "NCAAF": {
+   "ats": {
+    "features": [
+     "r_edge",
+     "epa_d",
+     "l4_d",
+     "sr_d",
+     "pass_d",
+     "sp",
+     "rest_d",
+     "neu",
+     "conf"
+    ],
+    "coef": [
+     -0.24374,
+     -0.91392,
+     0.07169,
+     0.87516,
+     0.14604,
+     0.07412,
+     0.16023,
+     0.22141,
+     -0.16772
+    ],
+    "intercept": -0.00778,
+    "mean": [
+     0.77311,
+     0.00975,
+     0.00664,
+     0.00515,
+     0.00143,
+     -5.73158,
+     -0.13199,
+     0.06491,
+     0.65111
+    ],
+    "std": [
+     9.22787,
+     0.14306,
+     0.26485,
+     0.07854,
+     0.18437,
+     15.1004,
+     3.28942,
+     0.24638,
+     0.47664
+    ]
+   },
+   "tot": {
+    "features": [
+     "tot_epa",
+     "pace",
+     "pts_edge",
+     "tot"
+    ],
+    "coef": [
+     0.21225,
+     0.38552,
+     -0.11911,
+     -0.77819
+    ],
+    "intercept": 0.44814,
+    "mean": [
+     0.01387,
+     123.95726,
+     0.61354,
+     54.64898
+    ],
+    "std": [
+     0.15973,
+     38.58034,
+     4.59983,
+     7.88105
+    ]
+   },
+   "record": {
+    "ats": {
+     "0": {
+      "n": 9126,
+      "w": 4616,
+      "pct": 50.6,
+      "z": -3.44,
+      "seasons_above": 1,
+      "seasons": 8
+     },
+     "0.5": {
+      "n": 4955,
+      "w": 2540,
+      "pct": 51.3,
+      "z": -1.58,
+      "seasons_above": 2,
+      "seasons": 8
+     },
+     "1": {
+      "n": 2103,
+      "w": 1093,
+      "pct": 52.0,
+      "z": -0.37,
+      "seasons_above": 3,
+      "seasons": 8
+     },
+     "1.5": {
+      "n": 747,
+      "w": 402,
+      "pct": 53.8,
+      "z": 0.79,
+      "seasons_above": 5,
+      "seasons": 8
+     },
+     "2": {
+      "n": 261,
+      "w": 134,
+      "pct": 51.3,
+      "z": -0.34,
+      "seasons_above": 4,
+      "seasons": 8
+     },
+     "2.5": {
+      "n": 83,
+      "w": 35,
+      "pct": 42.2,
+      "z": -1.86,
+      "seasons_above": 1,
+      "seasons": 6
+     },
+     "3": {
+      "n": 21,
+      "w": 9,
+      "pct": 42.9,
+      "z": -0.87,
+      "seasons_above": 2,
+      "seasons": 4
+     },
+     "4": {
+      "n": 3,
+      "w": 1,
+      "pct": 33.3,
+      "z": -0.66,
+      "seasons_above": 0,
+      "seasons": 2
+     }
+    },
+    "tot": {
+     "0": {
+      "n": 9191,
+      "w": 4570,
+      "pct": 49.7,
+      "z": -5.1,
+      "seasons_above": 0,
+      "seasons": 8
+     },
+     "0.5": {
+      "n": 5651,
+      "w": 2845,
+      "pct": 50.3,
+      "z": -3.06,
+      "seasons_above": 2,
+      "seasons": 8
+     },
+     "1": {
+      "n": 1699,
+      "w": 848,
+      "pct": 49.9,
+      "z": -2.04,
+      "seasons_above": 2,
+      "seasons": 8
+     },
+     "1.5": {
+      "n": 206,
+      "w": 98,
+      "pct": 47.6,
+      "z": -1.38,
+      "seasons_above": 2,
+      "seasons": 6
+     },
+     "2": {
+      "n": 9,
+      "w": 4,
+      "pct": 44.4,
+      "z": -0.48,
+      "seasons_above": 1,
+      "seasons": 3
+     },
+     "2.5": {
+      "n": 1,
+      "w": 0,
+      "pct": 0.0,
+      "z": -1.05,
+      "seasons_above": 0,
+      "seasons": 1
+     }
+    }
+   },
+   "tested": "2019-2026",
+   "lean": {
+    "ats": null,
+    "tot": null
+   }
+  }
+ }
+}
