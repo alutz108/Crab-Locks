@@ -123,7 +123,7 @@ def save(path, obj, pretty=False):
         json.dump(obj, f, indent=1 if pretty else None, separators=None if pretty else (",", ":"))
 
 KEEP = ["id", "date", "season", "week", "post", "home", "away", "hs", "as", "neu", "div", "hc", "ac",
-        "sp", "spO", "tot", "totO", "hml", "aml", "hso", "aso", "oo", "uo"]
+        "sp", "spO", "tot", "totO", "hml", "aml", "hso", "aso", "oo", "uo", "lineFlag"]
 
 def save_season(sport, season, games, source):
     rows = []
@@ -1292,6 +1292,33 @@ def model_predictions(sport):
     save(f"model/{sport}.json", {"updated": NOW.isoformat(timespec="seconds"), "season": y, "tested": P["tested"], "record": P["record"], "lean": P["lean"], "games": out})
     say(f"  {sport} model: predictions for {len(out)} upcoming games")
 
+# ------------------------------------------------------------------ data quality: reversed college spreads
+# A small share of college games (about 0.2% in basketball, 0.9% in football) have the spread recorded from the
+# wrong team's side. They show up as lines far from both teams' strength that make sense once flipped; for those
+# games the "underdog" by the recorded line wins about 70% of the time. We flag them so spread and moneyline
+# results leave them out (totals are unaffected).
+FLAG_T = {"NCAAF": (14, 7, 35, 3.0), "NCAAB": (12, 6, 30, 3.2)}
+
+def flag_reversed_lines(sport, seasons):
+    import model as M
+    T, F, cap, hfa = FLAG_T[sport]; total = 0
+    for s in seasons:
+        path = f"api/{sport}/{s}.json"; js = load(path, None)
+        if not js: continue
+        gs = js["games"]
+        done = [(g["home"], g["away"], g["hs"], g["as"], bool(g.get("neu"))) for g in gs if g.get("hs") is not None]
+        if len(done) < 50: continue
+        r, H = M.srs(done, {}, {"cap": cap, "lam": 3, "prior": 0.55, "hfa": hfa}, iters=15)
+        n = 0
+        for g in gs:
+            g.pop("lineFlag", None)
+            if g.get("sp") is None or g["home"] not in r or g["away"] not in r: continue
+            rm = (0 if g.get("neu") else H) + r[g["home"]] - r[g["away"]]
+            if abs(rm + g["sp"]) > T and abs(rm - g["sp"]) < F:
+                g["lineFlag"] = 1; n += 1
+        save(path, js); total += n
+    say(f"  {sport} line check: {total} games flagged as likely reversed spreads ({', '.join(map(str, seasons))})")
+
 # ------------------------------------------------------------------ index
 def write_index(state):
     idx = {"updated": NOW.isoformat(timespec="seconds"), "sports": {}, "notes": state.get("notes", {})}
@@ -1402,6 +1429,14 @@ def main():
                 guard(f"{sp} model", lambda sp=sp: model_predictions(sp))
         if "NCAAB" in sports:
             guard("NCAAB model", model_predictions_cbb)
+        for sp in ("NCAAF", "NCAAB"):
+            if sp not in sports: continue
+            cur = season_of(sp, TODAY)
+            if not state.get(f"lineflags_v1_{sp}"):
+                seasons = list(range(2013, cur + 1)); state[f"lineflags_v1_{sp}"] = 1
+            else:
+                seasons = [cur]
+            guard(f"{sp} line check", lambda sp=sp, seasons=seasons: flag_reversed_lines(sp, seasons))
     for sp in [x for x in splits_plan(morning=not args.odds_only) if x in sports or args.odds_only]:
         guard(f"{sp} public betting", lambda sp=sp: pull_splits(sp))
     save("state.json", state, pretty=True)
