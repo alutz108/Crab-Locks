@@ -1,15 +1,19 @@
 {
- "updated": "2026-11-11T01:22:42+00:00",
+ "updated": "2026-11-11T01:35:52+00:00",
  "sports": {
   "NFL": {
    "base": true,
    "api": [],
    "archive": [],
-   "splits": true
+   "splits": true,
+   "metrics": true,
+   "injuries": true,
+   "model": false
   },
   "NCAAF": {
    "base": true,
    "api": [
+    2013,
     2014,
     2015,
     2016,
@@ -25,7 +29,10 @@
     2026
    ],
    "archive": [],
-   "splits": true
+   "splits": true,
+   "metrics": true,
+   "injuries": false,
+   "model": false
   },
   "NBA": {
    "base": true,
@@ -35,11 +42,15 @@
    "archive": [
     2025
    ],
-   "splits": true
+   "splits": true,
+   "metrics": true,
+   "injuries": false,
+   "model": false
   },
   "NCAAB": {
    "base": false,
    "api": [
+    2013,
     2014,
     2015,
     2016,
@@ -55,7 +66,10 @@
     2026
    ],
    "archive": [],
-   "splits": true
+   "splits": true,
+   "metrics": true,
+   "injuries": false,
+   "model": false
   }
  },
  "notes": {}
