@@ -253,6 +253,24 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
 .pick-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .tbtn.pickbtn{border-color:var(--crab)}
 .m-show{display:none}
+.crabs{font-size:16px;letter-spacing:1px;line-height:1.2}
+.gcard{border:1px solid var(--line);border-radius:10px;padding:11px 12px;display:grid;gap:6px;background:var(--surface)}
+.gcard .mu{font-family:var(--fd);font-size:20px;font-weight:700;display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.gcard .mu small{font-family:var(--fb);font-size:12px;color:var(--muted);font-weight:500}
+.gcard .ln{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:14px;font-variant-numeric:tabular-nums}
+.gcard .ln b{font-weight:600}
+.gcard .md{font-size:13px;color:var(--muted)}
+.leanb{display:inline-block;font-size:12px;font-weight:700;border-radius:4px;padding:2px 8px}
+.leanb.hi{background:var(--win);color:#fff}.leanb.md{background:var(--win-bg);color:var(--win)}.leanb.split{background:var(--loss-bg);color:var(--loss)}.leanb.none{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.cmp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) minmax(0,1fr);border:1px solid var(--line);border-radius:8px;overflow:hidden;font-variant-numeric:tabular-nums;font-size:14px}
+.cmp > div{padding:6px 10px;border-bottom:1px solid var(--line)}
+.cmp .k{color:var(--muted);font-size:12px;font-weight:600;text-align:center;background:var(--surface-2)}
+.cmp .a{text-align:right}.cmp .hh{font-weight:700;background:var(--surface-2)}
+.cmp > div:nth-last-child(-n+3){border-bottom:0}
+.cmp .better{color:var(--win);font-weight:700}
+.reasons{margin:0;padding-left:18px;font-size:14px;display:grid;gap:4px}
+.proj{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:560px){.proj{grid-template-columns:minmax(0,1fr)}}
 #accountBtn.on{border-color:var(--win)}
 .acct-form{display:grid;gap:12px}
 .acct-err{color:var(--loss);font-size:14px;font-weight:600}
@@ -300,7 +318,7 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
 @media (max-width:640px){
   .desk{display:none !important}
   body{padding-bottom:calc(62px + env(safe-area-inset-bottom,0px))}
-  .tabbar{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px))}
+  .tabbar{display:grid;grid-template-columns:repeat(6,1fr);position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px))}
   .tabbar button{display:flex;flex-direction:column;align-items:center;gap:2px;border:0;background:none;color:var(--muted);font-size:11px;font-weight:600;padding:5px 0;cursor:pointer}
   .tabbar svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
   .tabbar .crab{font-size:20px;line-height:23px;filter:grayscale(1);opacity:.7}
@@ -392,7 +410,11 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
   .cat li button{padding:11px 14px 11px 40px;font-size:15px}
   .fsearch{margin:10px 10px 6px}
   /* pop-ups become full-screen sheets */
-  dialog{width:100vw;max-width:100vw;height:100%;max-height:100%;margin:0;border:0;border-radius:0}
+  dialog{width:100vw !important;max-width:100vw !important;height:100%;max-height:100%;margin:0;border:0;border-radius:0;overflow-x:hidden}
+  .gline > div, .cmp > div{min-width:0;overflow-wrap:anywhere}
+  .gline > div{padding:6px 7px}
+  #gameBody table.data td{white-space:normal}
+  .cmp{font-size:13px}
   .dlg-h{padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;flex-wrap:wrap}
   .dlg-h h2{font-size:22px}
   .dlg-b{padding:14px}
@@ -427,6 +449,7 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
       <button data-v="under" aria-pressed="false">Under</button>
     </div>
     <button class="tbtn today desk" id="openBoard">Today</button>
+    <button class="tbtn desk" id="openGames">Games</button>
     <button class="tbtn pickbtn desk" id="openPicks">🦀 <span class="mid-hide">Crab </span>Picks</button>
     <button class="tbtn desk" id="openBets">Bets</button>
     <button class="tbtn" id="newSystem">New</button>
@@ -570,6 +593,15 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
   <div class="dlg-b" id="acctBody"></div>
 </dialog>
 
+<dialog id="dlgGames" aria-labelledby="gamesTitle" style="width:min(900px,calc(100vw - 20px))">
+  <div class="dlg-h"><h2 id="gamesTitle">Games</h2><button class="lbtn" data-close>Close</button></div>
+  <div class="dlg-b">
+    <div class="ptabs" id="gamesSport"><button data-gsp="ALL" aria-pressed="true">All</button><button data-gsp="NFL" aria-pressed="false">NFL</button><button data-gsp="NCAAF" aria-pressed="false">College football</button><button data-gsp="NBA" aria-pressed="false">NBA</button><button data-gsp="NCAAB" aria-pressed="false">College basketball</button></div>
+    <div class="ptabs" id="gamesRange"><button data-gd="0" aria-pressed="true">Today</button><button data-gd="1" aria-pressed="false">Tomorrow</button><button data-gd="6" aria-pressed="false">Next 7 days</button></div>
+    <div id="gamesList" style="display:grid;gap:10px"></div>
+  </div>
+</dialog>
+
 <dialog id="dlgGame" aria-labelledby="gameTitle" style="width:min(760px,calc(100vw - 20px))">
   <div class="dlg-h"><h2 id="gameTitle">Game</h2><button class="lbtn" data-close>Close</button></div>
   <div class="dlg-b" id="gameBody"></div>
@@ -577,6 +609,7 @@ input[type=number],input[type=text],select.sel{width:100%;background:var(--surfa
 
 <nav class="tabbar" id="tabbar" aria-label="Main">
   <button data-view="board"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Today</span></button>
+  <button data-view="games"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg><span>Games</span></button>
   <button data-view="picks"><span class="crab" aria-hidden="true">🦀</span><span>Picks</span></button>
   <button data-view="build"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span>Build</span></button>
   <button data-view="bets"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg><span>Bets</span></button>
@@ -1760,7 +1793,7 @@ async function renderPicks(){
   const seasonsOf = sp => [...new Set((data.rows[sp] || []).map(r => r.g.season))].sort((a,b) => a-b);
   const rngS = (sp, arr) => arr.length ? (arr.length === 1 ? seasonLabel(sp, +arr[0]) : `${seasonLabel(sp, +arr[0])} to ${seasonLabel(sp, +arr[arr.length-1])}`) : '';
   let lastTier = null, rank = 0;
-  let html = (top ? `<div class="note" style="margin:0">The 10 systems with the best evidence: strong on both the seasons they were found on and later seasons they never saw, profitable in most individual seasons, big enough samples, and a sensible reason to work. Only #1 clearly beat what shuffled, no-edge data produced in the full audit; treat the rest as the best of the rest, not sure things.</div>` : '') + list.map(p => {
+  let html = (top ? crabScaleBox(['NFL','NCAAF','NBA','NCAAB']) : '') + (top ? `<div class="note" style="margin:0">The 10 systems with the best evidence: strong on both the seasons they were found on and later seasons they never saw, profitable in most individual seasons, big enough samples, and a sensible reason to work. Only #1 clearly beat what shuffled, no-edge data produced in the full audit; treat the rest as the best of the rest, not sure things.</div>` : '') + list.map(p => {
     rank++;
     const seasons = seasonsOf(p.sport), rng = arr => rngS(p.sport, arr);
     const head = (p.tier === 'exp' && lastTier !== 'exp') ? `<h3 style="font-family:var(--fd);margin:10px 0 0">Experimental</h3><div class="note" style="margin:0 0 4px">These passed a C grade on both found-on and tested-on seasons, but shuffled data with no real edge produced about as many systems like them. Most are probably luck. They stay off Today’s board unless you turn them on there.</div>` : '';
@@ -1770,7 +1803,7 @@ async function renderPicks(){
     const all = ev(p.f), a = ev({ ...p.f, season: tr }), b = ev({ ...p.f, season: te });
     const g = grade(all), up = all.upcoming.length;
     const rule = describe(p).split('; ').slice(1).join('; ');
-    const badge = { strong:'Strongest evidence', held:'Held up in testing', watch:'Watch list: thinner recent edge', exp:'Experimental: likely luck' }[p.tier];
+    const badge = { strong:'Strongest evidence · starts at 🦀🦀🦀', held:'Held up in testing · starts at 🦀🦀', watch:'Watch list · starts at 🦀', exp:'Experimental: likely luck · ½ 🦀' }[p.tier];
     return (top ? '' : head) + `<div class="pick-card"><div class="pick-head"><h3>${top ? `#${rank} · ` : ''}${esc(p.name)}${top ? ` <span class="muted" style="font-size:15px;font-family:var(--fb);font-weight:500">${SPORT_NAMES[p.sport]}</span>` : ''}</h3><span class="tier ${p.tier}">${badge}</span></div>
       <p>${esc(p.theory)}</p><div class="pick-rule">${esc(rule)}</div>
       <div class="pstats">${statBox('Tested on', rng(te) + ', seasons it never saw', b)}${statBox('Found on', rng(tr), a)}${statBox('All seasons', `Grade ${g === 'x' ? '–' : g}`, all)}</div>
@@ -1990,22 +2023,22 @@ async function renderBoard(){
         const p = pickFrom(b, sport, eff, []);
         const id = pickId(p);
         if (!items.has(id)) items.set(id, { p, srcs: [] });
-        items.get(id).srcs.push({ name: s.name, grade: g, kind: s.kind });
+        items.get(id).srcs.push({ name: s.name, grade: g, kind: s.kind, tier: s.tier });
       }
     }
   }
   const list = [...items.values()];
-  list.forEach(it => { it.p.systems = it.srcs.map(s => s.name); });
+  list.forEach(it => { it.p.systems = it.srcs.map(s => s.name); const sc = crabScore(it.p.sport, it.p.k).find(x => x.p.side === it.p.side && ((x.p.bet === 'over' || x.p.bet === 'under') === (it.p.bet === 'over' || it.p.bet === 'under'))); it.crabs = sc ? sc.crabs : 1; });
   // conflicts: picks on both sides of the same game and market
   const fam = p => p.bet === 'over' || p.bet === 'under' ? 'tot' : 'side';
   list.forEach(it => { it.conflict = list.some(o => o !== it && o.p.sport === it.p.sport && o.p.k === it.p.k && fam(o.p) === fam(it.p) && o.p.side !== it.p.side); });
   if (!list.length){ host.innerHTML = `<div class="empty">No games fit your systems ${boardDays ? 'in this window' : 'today'}. Try Next 3 days, or check back after the next data update.</div>`; return; }
-  list.sort((a,b) => a.p.date - b.p.date || b.srcs.length - a.srcs.length);
+  list.sort((a,b) => a.p.date - b.p.date || (b.crabs || 0) - (a.crabs || 0) || b.srcs.length - a.srcs.length);
   let html = '', day = null;
   for (const it of list){
     if (it.p.date !== day){ day = it.p.date; html += `<div class="dayhead">${day === TODAY ? 'Today, ' : ''}${fmtShort(day)}</div>`; }
     const i = regPick(it.p);
-    html += `<div class="board-item${it.conflict ? ' conflict' : ''}"><div ${gameAttrs(it.p.sport, it.p.k)}><div class="pick">${esc(pickText(it.p))}</div><div class="meta">${SPORT_NAMES[it.p.sport]}: ${esc(it.p.away)} @ ${esc(it.p.home)}${publicTag(it.p)}</div></div>
+    html += `<div class="board-item${it.conflict ? ' conflict' : ''}"><div ${gameAttrs(it.p.sport, it.p.k)}><div class="crabs" title="${crabName(it.crabs)}">${crabStr(it.crabs)} <span class="muted" style="font-size:12px;font-weight:600">${crabName(it.crabs)}</span></div><div class="pick">${esc(pickText(it.p))}</div><div class="meta">${SPORT_NAMES[it.p.sport]}: ${esc(it.p.away)} @ ${esc(it.p.home)}${publicTag(it.p)}</div></div>
       <div class="right"><div class="odds">${fmtOdds(it.p.odds)}</div>${logButton(i)}</div>
       <div class="sys">${it.srcs.map(s => `<span class="chip${s.kind === 'pick' ? ' pick-chip' : ''}">${s.kind === 'pick' ? '🦀 ' : ''}${esc(s.name)}<span class="gr">${s.grade === 'x' ? '' : s.grade}</span></span>`).join('')}</div>
       ${it.conflict ? '<div class="warn">Conflict: another system is on the other side of this game.</div>' : ''}</div>`;
@@ -2061,7 +2094,7 @@ setInterval(checkUpdates, 15 * 60 * 1000);
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
 /* ---------- navigation: tab bar on phones, pop-ups on larger screens ---------- */
-const VIEWS = { board:['#dlgBoard', () => renderBoard()], picks:['#dlgPicks', () => renderPicks()], bets:['#dlgBets', () => renderBets()], systems:['#dlgSystems', () => renderSystems()] };
+const VIEWS = { games:['#dlgGames', () => renderGames()], board:['#dlgBoard', () => renderBoard()], picks:['#dlgPicks', () => renderPicks()], bets:['#dlgBets', () => renderBets()], systems:['#dlgSystems', () => renderSystems()] };
 const isPhone = () => !!(window.matchMedia && window.matchMedia('(max-width:640px)').matches);
 let curView = 'build';
 function setTab(v){ curView = v; document.querySelectorAll('#tabbar [data-view]').forEach(b => b.setAttribute('aria-current', b.dataset.view === v ? 'page' : 'false')); }
@@ -2159,6 +2192,311 @@ document.addEventListener('click', e => {
 function lastGames(sport, team, before, n = 5){
   return (data.rows[sport] || []).filter(r => r.team === team && r.done && r.g.date < before).sort((a,b) => b.g.date - a.g.date).slice(0, n);
 }
+// ---- Crab Locks power ratings (shared by the app and the backtest) ----
+const RATE_CFG = {
+  NFL:   { cap: 28, lam: 3, prior: 0.55, hfaPrior: 1.8, T: 2.5 },
+  NCAAF: { cap: 35, lam: 3, prior: 0.55, hfaPrior: 3.0, T: 3.5 },
+  NBA:   { cap: 25, lam: 8, prior: 0.6,  hfaPrior: 2.5, T: 2.5 },
+  NCAAB: { cap: 30, lam: 6, prior: 0.6,  hfaPrior: 3.2, T: 3.5 },
+};
+function solveRatings(sport, games, priorR, priorO, priorD){
+  // games: [{home, away, hs, as, neu}] finished only
+  const cfg = RATE_CFG[sport];
+  const teams = new Set(); games.forEach(g => { teams.add(g.home); teams.add(g.away); });
+  const r = new Map(), o = new Map(), d = new Map();
+  teams.forEach(t => { r.set(t, (priorR && priorR.get(t)) || 0); o.set(t, (priorO && priorO.get(t)) || 0); d.set(t, (priorD && priorD.get(t)) || 0); });
+  const tot = games.reduce((a, g) => a + g.hs + g.as, 0); let mu = games.length ? tot / (2 * games.length) : 0;
+  let H = cfg.hfaPrior;
+  const by = new Map(); teams.forEach(t => by.set(t, []));
+  games.forEach((g, i) => { by.get(g.home).push(i); by.get(g.away).push(i); });
+  for (let it = 0; it < 40; it++){
+    // margin ratings
+    for (const t of teams){
+      let s = 0, n = 0;
+      for (const i of by.get(t)){ const g = games[i]; const h = g.neu ? 0 : H; let m = Math.max(-cfg.cap, Math.min(cfg.cap, g.hs - g.as));
+        if (g.home === t){ s += m - h + r.get(g.away); } else { s += -m + h + r.get(g.home); } n++; }
+      const p = (priorR && priorR.get(t)) || 0;
+      r.set(t, (s + cfg.lam * p) / (n + cfg.lam));
+    }
+    // centre ratings
+    let avg = 0; teams.forEach(t => avg += r.get(t)); avg /= teams.size || 1; teams.forEach(t => r.set(t, r.get(t) - avg));
+    let hs = 0, hn = 0; games.forEach(g => { if (!g.neu){ hs += Math.max(-cfg.cap, Math.min(cfg.cap, g.hs - g.as)) - (r.get(g.home) - r.get(g.away)); hn++; } });
+    H = (hs + 20 * cfg.hfaPrior) / (hn + 20);
+    // offense / defense (points): pts_for(t) = mu + o_t + d_opp + side*H/2
+    for (const t of teams){
+      let so = 0, sd = 0, n = 0;
+      for (const i of by.get(t)){ const g = games[i]; const home = g.home === t, opp = home ? g.away : g.home; const pf = home ? g.hs : g.as, pa = home ? g.as : g.hs; const hh = g.neu ? 0 : (home ? H / 2 : -H / 2);
+        so += pf - mu - d.get(opp) - hh; sd += pa - mu - o.get(opp) + hh; n++; }
+      o.set(t, (so + cfg.lam * ((priorO && priorO.get(t)) || 0)) / (n + cfg.lam));
+      d.set(t, (sd + cfg.lam * ((priorD && priorD.get(t)) || 0)) / (n + cfg.lam));
+    }
+    let ao = 0, ad = 0; teams.forEach(t => { ao += o.get(t); ad += d.get(t); }); ao /= teams.size || 1; ad /= teams.size || 1;
+    teams.forEach(t => { o.set(t, o.get(t) - ao); d.set(t, d.get(t) - ad); });
+  }
+  return { r, o, d, H, mu };
+}
+function regress(m, k){ const out = new Map(); if (m) m.forEach((v, t) => out.set(t, v * k)); return out; }
+function project(sport, R, g){
+  const h = g.neu ? 0 : R.H, rh = R.r.get(g.home), ra = R.r.get(g.away);
+  if (rh === undefined || ra === undefined) return null;
+  const margin = h + rh - ra;
+  const oh = R.o.get(g.home) || 0, dh = R.d.get(g.home) || 0, oa = R.o.get(g.away) || 0, da = R.d.get(g.away) || 0;
+  const total = 2 * R.mu + oh + da + oa + dh;
+  return { margin, spread: -margin, total };
+}
+
+const MODEL_NOTE = {
+  NFL: 'Track record: when this projection disagreed with the closing spread by 3+ points (20 seasons), its side covered 49.0%. No edge, so treat it as context, not a pick.',
+  NCAAF: 'Track record: when this projection disagreed with the closing spread by 3+ points (20 seasons), its side covered 49.4%. No edge, so treat it as context, not a pick.',
+  NBA: 'Track record: when this projection disagreed with the closing spread by 3+ points (15 seasons), its side covered 50.0%. No edge, so treat it as context, not a pick.',
+  NCAAB: 'Track record: when this projection disagreed with the closing spread by 6+ points (12 seasons), its side covered 53.1%, above break-even in 6 of 12 seasons. A small edge at best, within what luck can produce.'
+};
+const ratingsCache = new Map();
+function seasonRatings(sport){
+  const rows = data.rows[sport] || []; const c = ratingsCache.get(sport); if (c && c.rows === rows) return c;
+  const cur = rows.reduce((m, r) => Math.max(m, r.g.season), 0);
+  const games = s => rows.filter(r => r.H && r.done && r.g.season === s).map(r => ({ home: r.g.home, away: r.g.away, hs: r.g.hs, as: r.g.as, neu: !!r.g.neu }));
+  const prev = games(cur - 1), now = games(cur);
+  const P = prev.length ? solveRatings(sport, prev) : null;
+  const k = RATE_CFG[sport].prior;
+  const R = solveRatings(sport, now, P && regress(P.r, k), P && regress(P.o, k), P && regress(P.d, k));
+  if (!now.length && P){ R.r = regress(P.r, k); R.o = regress(P.o, k); R.d = regress(P.d, k); R.H = P.H; R.mu = P.mu; }
+  // only rank teams that played this season (or last, early on)
+  const teamsNow = new Set(now.flatMap(g => [g.home, g.away])); const pool = teamsNow.size ? [...teamsNow] : [...R.r.keys()];
+  const rank = new Map(pool.sort((a, b) => R.r.get(b) - R.r.get(a)).map((t, i) => [t, i + 1]));
+  const out = { rows, R, rank, n: pool.length, cur, played: now.length };
+  ratingsCache.set(sport, out); return out;
+}
+function teamStats(sport, team, season, before){
+  const list = (data.rows[sport] || []).filter(r => r.team === team && r.g.season === season && r.done && r.g.date < before).sort((a, b) => a.g.date - b.g.date);
+  const o = { W:0, L:0, T:0, aW:0, aL:0, aP:0, ov:0, un:0, pf:0, pa:0, n:list.length, last:'' };
+  list.forEach(r => { if (r.mg > 0) o.W++; else if (r.mg < 0) o.L++; else o.T++; if (isNum(r.atsM)){ if (r.atsM > 0) o.aW++; else if (r.atsM < 0) o.aL++; else o.aP++; }
+    if (isNum(r.tot)){ const p = r.pf + r.pa; if (p > r.tot) o.ov++; else if (p < r.tot) o.un++; } o.pf += r.pf; o.pa += r.pa; });
+  o.last = list.slice(-5).map(r => r.mg > 0 ? 'W' : r.mg < 0 ? 'L' : 'T').join('');
+  return o;
+}
+const hitsCache = new Map();
+function systemHits(sport){
+  const rows = data.rows[sport] || []; const key = systems.map(s => s.id + (s.saved || '')).join(',');
+  const c = hitsCache.get(sport); if (c && c.rows === rows && c.key === key) return c.map;
+  const map = new Map();
+  const sources = systems.filter(s => s.sport === sport).map(s => ({ ...s, kind:'mine' })).concat(PICKS.filter(p => p.sport === sport).map(p => ({ ...p, kind:'pick' })));
+  for (const s of sources){
+    const f = JSON.parse(JSON.stringify(s.f || {})); migrateFor(f, sport);
+    const res = evaluate({ sport, bet: s.bet, fade: !!s.fade, hideDup: !!s.hideDup, f });
+    const g = grade(res), eff = effBet(s.bet, !!s.fade);
+    for (const b of res.upcoming.concat(res.bets)){
+      const p = pickFrom(b, sport, eff, [s.name]);
+      const tested = s.kind === 'pick' ? ({ strong:3, held:2, watch:1, exp:0.5 })[s.tier] ?? 0.5 : ({ A:2, B:1.5, C:1 })[g] ?? 0.5;
+      if (!map.has(b.r.g.k)) map.set(b.r.g.k, []);
+      map.get(b.r.g.k).push({ name: s.name, kind: s.kind, tier: s.tier, grade: g, p, weight: tested, res: b.res });
+    }
+  }
+  hitsCache.set(sport, { rows, key, map }); return map;
+}
+/* ---------- Crab scale (1–5 🦀) ----------
+   Starts from the strongest system on a side (strongest evidence 3, held up 2, watch list 1, experimental ½;
+   your saved systems by grade: A 2, B 1.5, C 1), +1 for each other tested system agreeing (up to +2),
+   −2 if a tested system is on the other side. On live games: −1 for quarterback uncertainty (NFL),
+   ±½ when the Crab Locks model clearly agrees or disagrees. 5 = Crab Lock. */
+const CRAB_START = 20261110;   // live tracking starts the day the scale launched
+const crabStr = n => '🦀'.repeat(n);
+const crabName = n => n >= 5 ? 'Crab Lock' : n === 4 ? 'Strong' : n === 3 ? 'Solid' : n === 2 ? 'Lean' : 'Slight';
+const toCrabs = s => s >= 5 ? 5 : s >= 4 ? 4 : s >= 3 ? 3 : s >= 2 ? 2 : 1;
+function crabScore(sport, k, ctx = {}){
+  const hits = systemHits(sport).get(k) || [];
+  const fam = p => p.bet === 'over' || p.bet === 'under' ? 'tot' : 'side';
+  const sides = new Map();
+  hits.forEach(h => { const id = fam(h.p) + '|' + h.p.side; const o = sides.get(id) || { p: h.p, list: [] }; o.list.push(h); sides.set(id, o); });
+  const out = [];
+  for (const [id, o] of sides){
+    const L = o.list.slice().sort((a, b) => b.weight - a.weight);
+    const best = L[0], why = [];
+    let s = best.weight; why.push([`${best.kind === 'pick' ? '🦀 ' : ''}${best.name} (${best.kind === 'pick' ? ({ strong:'strongest evidence', held:'held up in testing', watch:'watch list', exp:'experimental' })[best.tier] : 'your system, grade ' + (best.grade === 'x' ? '–' : best.grade)})`, best.weight]);
+    const agree = L.slice(1).filter(h => h.weight >= 1);
+    const plus = Math.min(2, agree.length); if (plus) { s += plus; why.push([`${agree.length} more tested system${agree.length === 1 ? '' : 's'} agree${agree.length === 1 ? 's' : ''}: ${agree.slice(0, 3).map(h => h.name).join(', ')}`, plus]); }
+    const rival = [...sides.entries()].filter(([oid, x]) => oid !== id && oid.split('|')[0] === id.split('|')[0]).flatMap(([, x]) => x.list).filter(h => h.weight >= 1);
+    if (rival.length){ s -= 2; why.push([`Tested system on the other side: ${rival.slice(0, 2).map(h => h.name).join(', ')}`, -2]); }
+    const g = (data.rows[sport] || []).find(r => r.g.k === k)?.g;
+    if (ctx.I && g){
+      const teams = fam(o.p) === 'tot' ? [g.home, g.away] : [o.p.side];
+      const q = teams.flatMap(tm => ((ctx.I.teams || {})[tm] || []).filter(p => p.pos === 'QB' && /out|doubt|question/i.test(p.status)).map(p => `${tm} QB ${p.name} ${p.status.toLowerCase()}`));
+      if (q.length){ s -= 1; why.push([`Quarterback uncertainty: ${q.join('; ')}`, -1]); }
+    }
+    if (ctx.MD && g && fam(o.p) === 'side'){
+      const ml = modelLine(ctx.MD, g);
+      if (ml){ const forHome = ml.ats, edge = o.p.side === g.home ? forHome : -forHome;
+        if (edge >= 1){ s += 0.5; why.push([`Crab Locks model also likes this side (+${edge.toFixed(1)} pts)`, 0.5]); }
+        else if (edge <= -1.5){ s -= 0.5; why.push([`Crab Locks model leans the other way (${edge.toFixed(1)} pts)`, -0.5]); } }
+    }
+    out.push({ p: o.p, score: s, crabs: toCrabs(s), why, names: L.map(h => h.name), n: L.filter(h => h.weight >= 1).length, rival: rival.length > 0, res: best.res });
+  }
+  return out.sort((a, b) => b.score - a.score);
+}
+function leanFor(sport, k, ctx){
+  const hits = systemHits(sport).get(k) || [];
+  const sc = crabScore(sport, k, ctx);
+  if (!sc.length) return { level:'none', text:'No lean', hits, crabs: 0 };
+  const best = sc[0];
+  if (best.rival && sc.some(x => x !== best && x.rival && x.score >= best.score - 0.5)) return { level:'split', text:'Systems split', best, rival: sc.find(x => x !== best && x.rival), hits, crabs: 0 };
+  return { level: best.crabs >= 4 ? 'hi' : 'md', text: `${crabStr(best.crabs)} ${pickText(best.p)}`, best, hits, crabs: best.crabs };
+}
+function crabRecord(sports){
+  // live scoreboard: every rated pick on games played since the scale launched (no injury/model adjustments, so it's reproducible)
+  const tally = { 1:[0,0,0,0], 2:[0,0,0,0], 3:[0,0,0,0], 4:[0,0,0,0], 5:[0,0,0,0] };
+  for (const sp of sports){
+    const map = systemHits(sp);
+    for (const [k, hits] of map){
+      const g = (data.rows[sp] || []).find(r => r.g.k === k)?.g; if (!g || g.date < CRAB_START || !isNum(g.hs)) continue;
+      const sc = crabScore(sp, k); if (!sc.length) continue;
+      const b = sc[0]; if (b.rival) continue;
+      const hit = hits.find(h => h.p.side === b.p.side && h.res); if (!hit) continue;
+      const t = tally[b.crabs]; if (hit.res === 'W') t[0]++; else if (hit.res === 'L') t[1]++; else t[2]++;
+      const bb = (data.rows[sp] || []).find(r => r.g.k === k); t[3] += hit.res === 'W' ? (hit.p.odds < 0 ? 100 / -hit.p.odds : hit.p.odds / 100) : hit.res === 'L' ? -1 : 0;
+    }
+  }
+  return tally;
+}
+const CRAB_BACKTEST = { 4:{ rec:'136-94', pct:59.1, roi:21.2, n:231 }, 3:{ rec:'268-214', pct:55.6, roi:9.8, n:498 }, 2:{ rec:'394-377', pct:51.1, roi:3.7, n:781 } };
+function crabScaleBox(sports){
+  const T = crabRecord(sports);
+  const row = n => { const t = T[n], d = t[0] + t[1]; return `<tr><td>${crabStr(n)} <span class="muted">${crabName(n)}</span></td><td class="num">${d + t[2] ? `${t[0]}-${t[1]}${t[2] ? '-' + t[2] : ''}` : '–'}</td><td class="num">${d ? (t[0] / d * 100).toFixed(0) + '%' : '–'}</td><td class="num">${CRAB_BACKTEST[n] ? `${CRAB_BACKTEST[n].rec} (${CRAB_BACKTEST[n].pct}%)` : n === 5 ? 'none yet' : '–'}</td></tr>`; };
+  return `<div class="about" style="display:grid;gap:6px"><h4>The Crab scale</h4>
+    <p>Each lean gets 1–5 🦀 from the evidence behind it: how strong the best system is, how many tested systems agree, whether any are on the other side, quarterback news (NFL), and whether the Crab Locks model agrees. 🦀🦀🦀🦀🦀 is a <b>Crab Lock</b>: the strongest evidence Crab Locks has, rare, and still not a sure thing.</p>
+    <div class="tscroll"><table class="data"><thead><tr><th>Rating</th><th class="num">Live record</th><th class="num">Win %</th><th class="num">Backtest</th></tr></thead><tbody>${[5,4,3,2,1].map(row).join('')}</tbody></table></div>
+    <p class="note" style="margin:0">Live record counts every rated pick on games since Nov 10, 2026, graded automatically. The backtest is generous, because the systems were chosen partly on those seasons; the live record is the honest test.</p></div>`;
+}
+let gamesSport = 'ALL', gamesDays = 0;
+async function renderGames(){
+  const host = $('#gamesList'); host.innerHTML = '<div class="empty">Loading games…</div>';
+  const sports = gamesSport === 'ALL' ? ['NFL','NCAAF','NBA','NCAAB'] : [gamesSport];
+  const start = gamesDays === 1 ? addDays(TODAY, 1) : TODAY, end = addDays(TODAY, gamesDays);
+  const items = [];
+  for (const sp of sports){
+    await ensureSport(sp);
+    const rows = (data.rows[sp] || []).filter(r => r.H && !r.done && r.g.date >= start && r.g.date <= end);
+    if (!rows.length) continue;
+    const RT = seasonRatings(sp);
+    const I = sp === 'NFL' ? await loadInjuries('NFL') : null;
+    const MD = (sp === 'NFL' || sp === 'NCAAF') ? await loadModel(sp) : null;
+    rows.forEach(r => items.push({ sp, r, RT, I, MD }));
+  }
+  if (!items.length){ host.innerHTML = `<div class="empty">No games with lines ${gamesDays === 0 ? 'today' : gamesDays === 1 ? 'tomorrow' : 'in the next 7 days'}${gamesSport === 'ALL' ? '' : ' for ' + SPORT_NAMES[gamesSport]}. Lines load with each daily update.</div>`; return; }
+  items.sort((a, b) => a.r.g.date - b.r.g.date || ['NFL','NCAAF','NBA','NCAAB'].indexOf(a.sp) - ['NFL','NCAAF','NBA','NCAAB'].indexOf(b.sp) || (a.r.g.home > b.r.g.home ? 1 : -1));
+  let html = '', day = null, sport = null;
+  for (const it of items){
+    const g = it.r.g, H = it.r, A = it.r.pair;
+    if (g.date !== day){ day = g.date; sport = null; html += `<div class="dayhead">${day === TODAY ? 'Today, ' : ''}${fmtShort(day)}</div>`; }
+    if (it.sp !== sport && gamesSport === 'ALL'){ sport = it.sp; html += `<div class="muted" style="font-weight:700;font-size:13px;margin-top:2px">${SPORT_NAMES[sport]}</div>`; }
+    const pr = project(it.sp, it.RT.R, g);
+    const rk = t => it.RT.rank.get(t) ? `#${it.RT.rank.get(t)}` : '';
+    const lean = leanFor(it.sp, g.k, { I: it.I, MD: it.MD });
+    const mv = isNum(g.spO) && isNum(g.sp) && g.spO !== g.sp ? ` <span class="muted">(opened ${fmtLine(g.spO)})</span>` : '';
+    const pub = isNum(H.bets) ? `<span>Public: ${Math.round(H.bets >= 50 ? H.bets : 100 - H.bets)}% on ${esc(H.bets >= 50 ? g.home : g.away)}</span>` : '';
+    const sysN = lean.hits.length;
+    html += `<div class="gcard" ${gameAttrs(it.sp, g.k)}>
+      <div class="mu"><span class="pick">${esc(g.away)} <small>${rk(g.away)}</small> @ ${esc(g.home)} <small>${rk(g.home)}</small></span><span class="leanb ${lean.level}">${esc(lean.text)}</span></div>
+      <div class="ln"><span><b>${esc(g.home)} ${fmtLine(g.sp)}</b>${mv}</span><span>Total <b>${isNum(g.tot) ? g.tot : '–'}</b></span>${isNum(H.ml) && isNum(A?.ml) ? `<span>ML ${esc(g.away)} ${fmtOdds(A.ml)} / ${esc(g.home)} ${fmtOdds(H.ml)}</span>` : ''}${pub}</div>
+      ${it.I ? (() => { const q = [g.away, g.home].flatMap(tm => ((it.I.teams || {})[tm] || []).filter(p => p.pos === 'QB' && /out|doubt|question/i.test(p.status)).map(p => `${tm} QB ${p.status.toLowerCase()}`)); return q.length ? `<div class="md" style="color:var(--loss);font-weight:600">⚠ ${esc(q.join(' · '))}</div>` : ''; })() : ''}
+      <div class="md">${(() => { const ml = modelLine(it.MD, g); if (ml) return `Crab Locks model: ${esc(g.home)} ${fmtLine(ml.sp)}, total ${ml.tot}`; return pr ? `Crab Locks line: ${esc(g.home)} ${fmtLine(Math.round(pr.spread * 2) / 2)}, total ${Math.round(pr.total * 2) / 2}` : 'Not enough games for a projection yet'; })()}${sysN ? ` · ${sysN} system${sysN === 1 ? '' : 's'} on this game` : ''}</div></div>`;
+  }
+  html += '<div class="note">Tap a game for the full breakdown, including advanced metrics and injuries. Leans come only from tested systems (Crab Picks and your saved systems with good grades); the Crab Locks line is a projection from this season’s scores, shown for context.</div>';
+  host.innerHTML = html;
+}
+$('#openGames').addEventListener('click', () => openView('games'));
+$('#gamesSport').addEventListener('click', e => { const b = e.target.closest('[data-gsp]'); if (!b) return; gamesSport = b.dataset.gsp; $('#gamesSport').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderGames(); });
+$('#gamesRange').addEventListener('click', e => { const b = e.target.closest('[data-gd]'); if (!b) return; gamesDays = +b.dataset.gd; $('#gamesRange').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderGames(); });
+
+/* ---------- advanced metrics + injuries ---------- */
+const metricsCache = {}, injCache = {}, espnInj = {};
+async function loadMetrics(sport){
+  if (metricsCache[sport] !== undefined) return metricsCache[sport];
+  const ent = remote.index?.sports?.[sport] || {};
+  metricsCache[sport] = null;
+  if (ent.metrics){ try{ metricsCache[sport] = await fetchJSON(`data/metrics/${sport}.json`, remote.index.updated); }catch(e){} }
+  return metricsCache[sport];
+}
+const modelCache = {};
+async function loadModel(sport){
+  if (modelCache[sport] !== undefined) return modelCache[sport];
+  const ent = remote.index?.sports?.[sport] || {}; modelCache[sport] = null;
+  if (ent.model){ try{ modelCache[sport] = await fetchJSON(`data/model/${sport}.json`, remote.index.updated); }catch(e){} }
+  return modelCache[sport];
+}
+function modelLine(MD, g){
+  const m = MD && MD.games && MD.games[g.date + '|' + g.home + '|' + g.away]; if (!m) return null;
+  const sp = isNum(g.sp) ? g.sp : m.sp, tot = isNum(g.tot) ? g.tot : m.line_tot;
+  return { sp: Math.round((sp - m.ats) * 2) / 2, tot: Math.round((tot + m.tot) * 2) / 2, ats: m.ats, dtot: m.tot };
+}
+function modelRecordText(MD, which, edge){
+  const rec = MD && MD.record && MD.record[which]; if (!rec) return '';
+  const keys = Object.keys(rec).map(Number).filter(k => k > 0 && Math.abs(edge) >= k).sort((a, b) => b - a);
+  const k = keys.find(x => rec[x] && rec[x].n >= 30) ?? keys[0];
+  if (k === undefined || !rec[k]) { const r0 = rec['0'] || rec[0]; return r0 ? `Across all tested games the model’s side went ${r0.w}-${r0.n - r0.w} (${r0.pct}%).` : ''; }
+  const r = rec[k];
+  return `In testing (${MD.tested}), when the model was ${k}+ point${k === 1 ? '' : 's'} off the market, its side went ${r.w}-${r.n - r.w} (${r.pct}%), above break-even in ${r.seasons_above} of ${r.seasons} seasons.`;
+}
+async function loadInjuries(sport){
+  if (injCache[sport] !== undefined) return injCache[sport];
+  const ent = remote.index?.sports?.[sport] || {};
+  injCache[sport] = null;
+  if (ent.injuries){ try{ injCache[sport] = await fetchJSON(`data/injuries/${sport}.json`, remote.index.updated); }catch(e){} }
+  if (!injCache[sport] && (sport === 'NBA' || sport === 'NFL')) injCache[sport] = await espnInjuries(sport);
+  return injCache[sport];
+}
+async function espnInjuries(sport){
+  // ESPN's league injury list, read live from the browser (same approach as live scores). Optional.
+  if (espnInj[sport] !== undefined) return espnInj[sport];
+  espnInj[sport] = null;
+  try{
+    const path = { NBA:'basketball/nba', NFL:'football/nfl' }[sport];
+    const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${path}/injuries`); if (!r.ok) return null;
+    const js = await r.json();
+    const names = [...new Set((data.rows[sport] || []).map(x => x.team))];
+    const teams = {};
+    for (const tm of js.injuries || []){
+      const our = matchTeamName(sport, tm.displayName || tm.team?.displayName, names); if (!our) continue;
+      teams[our] = (tm.injuries || []).map(i => ({ name: i.athlete?.displayName || '', pos: i.athlete?.position?.abbreviation || '', status: i.status || i.type?.description || '', injury: i.details?.type || i.shortComment || '' }))
+        .filter(p => /out|doubtful|questionable|day-to-day/i.test(p.status));
+    }
+    espnInj[sport] = { source:'ESPN', teams, live:true };
+  }catch(e){}
+  return espnInj[sport];
+}
+const pctv = v => !isNum(v) ? '–' : (v <= 1 ? v * 100 : v).toFixed(1) + '%';
+const num1 = v => isNum(v) ? (+v).toFixed(1) : '–';
+const num3 = v => isNum(v) ? ((v > 0 ? '+' : '') + (+v).toFixed(2)) : '–';
+const METRIC_ROWS = {
+  NFL: [['EPA per play, offense','off_epa',true,num3],['EPA per play, defense','def_epa',false,num3],['Success rate, offense','off_sr',true,pctv],['Success rate, defense','def_sr',false,pctv],
+        ['Pass EPA, offense','off_pass_epa',true,num3],['Rush EPA, offense','off_rush_epa',true,num3],['Pass EPA allowed','def_pass_epa',false,num3],['Rush EPA allowed','def_rush_epa',false,num3],
+        ['Last 4 games: EPA offense','l4_off_epa',true,num3],['Last 4 games: EPA defense','l4_def_epa',false,num3],
+        ['QB pressured (per dropback)','pressure_allowed',false,pctv],['Defense pressure rate','pressure_rate',true,pctv],['Bad throw %','bad_throw_pct',false,pctv],['Drop %','drop_pct',false,pctv]],
+  NBA: [['Net rating','net',true,num1],['Offensive rating','ortg',true,num1],['Defensive rating','drtg',false,num1],['Pace','pace',null,num1],['Last 10: net rating','l10_net',true,num1],
+        ['Effective FG%','efg',true,pctv],['Turnover rate','tov',false,pctv],['Off. rebound rate','orb',true,pctv],['Free throw rate','ftr',true,pctv],['Opponent eFG%','oefg',false,pctv],['Forced turnover rate','otov',true,pctv]],
+  NCAAF: [['SP+ rating','sp',true,num1],['SP+ offense','sp_off',true,num1],['SP+ defense','sp_def',false,num1],['Offense PPA per play','off_ppa',true,num3],['Offense success rate','off_sr',true,pctv],
+          ['Offense explosiveness','off_expl',true,num3],['Defense PPA per play','def_ppa',false,num3],['Defense success rate','def_sr',false,pctv],['Havoc rate','havoc',true,pctv]],
+  NCAAB: [['Adjusted net rating','adj_net',true,num1],['Adjusted offense','adj_off',true,num1],['Adjusted defense','adj_def',false,num1],['Pace','pace',null,num1],
+          ['Effective FG%','efg',true,pctv],['Turnover rate','tov',false,pctv],['Off. rebound rate','orb',true,pctv],['Free throw rate','ftr',true,pctv],['Opponent eFG%','oefg',false,pctv]],
+};
+const METRIC_NOTE = {
+  NFL: 'EPA (expected points added) measures how much each play changed the expected score; success rate is the share of plays that gained enough yardage (nflverse play-by-play, runs and passes only). Pressure, bad-throw and drop rates are Pro Football Reference’s charting stats, published by nflverse.',
+  NBA: 'Ratings are points per 100 possessions; pace is possessions per game. From ESPN box scores.',
+  NCAAF: 'SP+ is a tempo- and opponent-adjusted efficiency rating (Bill Connelly). PPA is predicted points added per play. From CollegeFootballData.com.',
+  NCAAB: 'Adjusted ratings are points per 100 possessions against an average opponent. From CollegeBasketballData.com.',
+};
+function metricRank(teams, key, hi){
+  const vals = Object.entries(teams).filter(([, v]) => isNum(v[key])).sort((a, b) => hi ? b[1][key] - a[1][key] : a[1][key] - b[1][key]);
+  return new Map(vals.map(([t], i) => [t, i + 1]));
+}
+function metricLine(sport, M, g){
+  const h = M.teams[g.home], a = M.teams[g.away]; if (!h || !a) return null;
+  if (sport === 'NCAAF' && isNum(h.sp) && isNum(a.sp)) return { label:'SP+ line', margin: h.sp - a.sp + (g.neu ? 0 : 2.5) };
+  if ((sport === 'NBA' || sport === 'NCAAB') && isNum(h[sport === 'NBA' ? 'net' : 'adj_net']) && isNum(a[sport === 'NBA' ? 'net' : 'adj_net'])){
+    const k = sport === 'NBA' ? 'net' : 'adj_net', pace = ((h.pace || (sport === 'NBA' ? 99 : 68)) + (a.pace || (sport === 'NBA' ? 99 : 68))) / 2;
+    return { label:'Efficiency line', margin: (h[k] - a[k]) * pace / 100 + (g.neu ? 0 : (sport === 'NBA' ? 2.5 : 3.2)) };
+  }
+  return null;
+}
 async function openGame(sport, k){
   await ensureSport(sport);
   const rows = (data.rows[sport] || []).filter(r => r.g.k === k); if (!rows.length) return;
@@ -2181,6 +2519,62 @@ async function openGame(sport, k){
       <div class="t">Over</div><div>${pc(g.ob)}</div><div>${pc(g.om)}</div></div>
       <div class="note" style="margin-top:-6px">From Playbook’s last snapshot before the game.</div>`;
   }
+  // Crab Locks model (NFL, NCAAF)
+  const MD = (sport === 'NFL' || sport === 'NCAAF') ? await loadModel(sport) : null, ML = modelLine(MD, g);
+  if (ML){
+    const se = +(ML.ats).toFixed(1), te = +(ML.dtot).toFixed(1);
+    html += `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Crab Locks model</h4>
+      <div class="proj"><div class="pstat"><div class="k">Model spread</div><div class="v">${esc(g.home)} ${fmtLine(ML.sp)}</div><div class="s">Market ${esc(g.home)} ${fmtLine(g.sp)} · ${Math.abs(se) < 0.5 ? 'agrees with the market' : `likes ${esc(se > 0 ? g.home : g.away)} by ${Math.abs(se)}`}</div><div class="s">${esc(modelRecordText(MD, 'ats', se))}</div></div>
+      <div class="pstat"><div class="k">Model total</div><div class="v">${ML.tot}</div><div class="s">Market ${isNum(g.tot) ? g.tot : '–'} · ${Math.abs(te) < 0.5 ? 'agrees with the market' : `${Math.abs(te)} ${te > 0 ? 'higher' : 'lower'}`}</div><div class="s">${esc(modelRecordText(MD, 'tot', te))}</div></div></div>
+      <div class="note" style="margin-top:-4px">Uses play-by-play efficiency (EPA, success rate, passing matchups, last 4 games), score-based ratings, rest, home field, ${sport === 'NFL' ? 'division games and weather' : 'and conference games'}, all as of game day, and starts from the market line. In walk-forward testing it never cleared the bar for a lean, so it’s shown for context: when it disagrees, check the news for why.</div>`;
+  }
+  // projection + comparison
+  const RT = seasonRatings(sport), pr = project(sport, RT.R, g);
+  if (pr){
+    const sp = Math.round(pr.spread * 2) / 2, tt = Math.round(pr.total * 2) / 2;
+    const se = isNum(g.sp) ? +(g.sp - pr.spread).toFixed(1) : null, te = isNum(g.tot) ? +(pr.total - g.tot).toFixed(1) : null;
+    html += `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">${ML ? 'Ratings-only projection' : 'Crab Locks projection'}</h4>
+      <div class="proj"><div class="pstat"><div class="k">Projected spread</div><div class="v">${esc(g.home)} ${fmtLine(sp)}</div><div class="s">Market ${esc(g.home)} ${fmtLine(g.sp)}${se !== null ? (Math.abs(se) < 0.5 ? ' · matches the market' : ` · projection likes ${esc(se > 0 ? g.home : g.away)} by ${Math.abs(se)}`) : ''}</div></div>
+      <div class="pstat"><div class="k">Projected total</div><div class="v">${tt}</div><div class="s">Market ${isNum(g.tot) ? g.tot : '–'}${te !== null ? ` · ${Math.abs(te)} ${te > 0 ? 'higher' : 'lower'}` : ''}</div></div>
+      <div class="pstat"><div class="k">Win chance</div><div class="v">${esc(pr.margin >= 0 ? g.home : g.away)} ${Math.round(100 / (1 + Math.exp(-Math.abs(pr.margin) / ({NFL:6.5,NCAAF:8,NBA:7,NCAAB:6.5})[sport])))}%</div><div class="s">From the projected margin</div></div></div>
+      <div class="note" style="margin-top:-4px">Built from this season’s scores (${RT.played} games), adjusted for opponents and home ${sport.includes('B') ? 'court' : 'field'}, with last season as a starting point. ${MODEL_NOTE[sport]}</div>`;
+  }
+  const sA = teamStats(sport, A.team, g.season, g.date), sH = teamStats(sport, H.team, g.season, g.date);
+  const rr = t => RT.R.r.get(t), off = t => RT.R.o.get(t), def = t => RT.R.d.get(t);
+  const fmt1 = v => isNum(v) ? (v > 0 ? '+' : '') + v.toFixed(1) : '–';
+  const better = (a, h, hi) => isNum(a) && isNum(h) && a !== h ? ((a > h) === hi ? ['better',''] : ['','better']) : ['',''];
+  const rowC = (label, a, h, cls = ['','']) => `<div class="a ${cls[0]}">${a}</div><div class="k">${label}</div><div class="${cls[1]}">${h}</div>`;
+  const ppg = s => s.n ? (s.pf / s.n).toFixed(1) : '–', papg = s => s.n ? (s.pa / s.n).toFixed(1) : '–';
+  html += `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Matchup</h4><div class="cmp">
+    <div class="a hh">${esc(g.away)}</div><div class="k hh"></div><div class="hh">${esc(g.home)}</div>
+    ${rowC('Power rating (rank)', `${fmt1(rr(A.team))} (#${RT.rank.get(A.team) || '–'})`, `${fmt1(rr(H.team))} (#${RT.rank.get(H.team) || '–'})`, better(rr(A.team), rr(H.team), true))}
+    ${rowC('Offense vs. average (pts)', fmt1(off(A.team)), fmt1(off(H.team)), better(off(A.team), off(H.team), true))}
+    ${rowC('Defense vs. average (pts allowed)', fmt1(def(A.team)), fmt1(def(H.team)), better(def(A.team), def(H.team), false))}
+    ${rowC('Record', `${sA.W}-${sA.L}${sA.T ? '-' + sA.T : ''}`, `${sH.W}-${sH.L}${sH.T ? '-' + sH.T : ''}`)}
+    ${rowC('Against the spread', `${sA.aW}-${sA.aL}${sA.aP ? '-' + sA.aP : ''}`, `${sH.aW}-${sH.aL}${sH.aP ? '-' + sH.aP : ''}`, better(sA.aW - sA.aL, sH.aW - sH.aL, true))}
+    ${rowC('Over / under', `${sA.ov}-${sA.un}`, `${sH.ov}-${sH.un}`)}
+    ${rowC('Points scored / allowed', `${ppg(sA)} / ${papg(sA)}`, `${ppg(sH)} / ${papg(sH)}`)}
+    ${rowC('Last 5', sA.last || '–', sH.last || '–')}
+    ${rowC('Days of rest', isNum(A.rest) ? A.rest : '–', isNum(H.rest) ? H.rest : '–', better(A.rest, H.rest, true))}
+    ${rowC('Streak', isNum(A.strk) && A.strk ? (A.strk > 0 ? 'W' + A.strk : 'L' + -A.strk) : '–', isNum(H.strk) && H.strk ? (H.strk > 0 ? 'W' + H.strk : 'L' + -H.strk) : '–')}
+  </div><div class="note" style="margin-top:-4px">Offense and defense are points above or below an average team, adjusted for opponents. For defense, lower is better. Green marks the better side.</div>`;
+  // advanced metrics (filled in after the sheet opens)
+  html += `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Advanced metrics</h4><div id="gameAdv"><div class="muted">Loading…</div></div>`;
+  html += `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Injuries</h4><div id="gameInj"><div class="muted">Loading…</div></div>`;
+  // head-to-head
+  const h2h = (data.rows[sport] || []).filter(r => r.team === H.team && r.opp === A.team && r.done && r.g.date < g.date).sort((a, b) => b.g.date - a.g.date).slice(0, 5);
+  if (h2h.length) html += `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Recent meetings</h4><table class="data"><tbody>${h2h.map(r => `<tr><td>${fmtDate(r.g.date)}</td><td>${esc(r.g.away)} ${r.g.as}, ${esc(r.g.home)} ${r.g.hs}</td><td>${isNum(r.atsM) ? `${esc(H.team)} <span class="${r.atsM > 0 ? 'W' : r.atsM < 0 ? 'L' : 'P'}">${r.atsM > 0 ? 'covered' : r.atsM < 0 ? 'didn’t cover' : 'pushed'}</span> ${fmtLine(r.sp)}` : ''}</td></tr>`).join('')}</tbody></table>`;
+  // lean summary
+  const IJ = sport === 'NFL' ? await loadInjuries('NFL') : null;
+  const L = leanFor(sport, k, { I: IJ, MD }), reasons = [];
+  if (L.best){
+    reasons.push(`<b>${esc(pickText(L.best.p))}: ${crabStr(L.best.crabs)} ${crabName(L.best.crabs)}</b> (score ${L.best.score}). ${L.best.why.map(([w, pts]) => `${esc(w)} <span class="${pts >= 0 ? 'W' : 'L'}">${pts >= 0 ? '+' : ''}${pts}</span>`).join(' · ')}`);
+  }
+  if (L.rival) reasons.push(`<b>${esc(pickText(L.rival.p))}</b> also has support: ${esc(L.rival.names.slice(0, 3).join(', '))}. When tested systems disagree, it’s usually best to pass.`);
+  if (isNum(g.spO) && isNum(g.sp) && g.spO !== g.sp){ const toward = g.sp < g.spO ? g.home : g.away; reasons.push(`The line moved ${Math.abs(+(g.sp - g.spO).toFixed(1))} point${Math.abs(g.sp - g.spO) === 1 ? '' : 's'} toward ${esc(toward)} since it opened.`); }
+  if (isNum(H.bets)){ const pubT = H.bets >= 50 ? g.home : g.away, pb = Math.round(Math.max(H.bets, 100 - H.bets)); const gap = isNum(H.money) ? Math.round((H.bets >= 50 ? H.money : 100 - H.money) - pb) : null; reasons.push(`The public has ${pb}% of spread bets on ${esc(pubT)}${gap !== null ? `, with ${gap >= 0 ? '+' : ''}${gap} points more money than bets` : ''}.`); }
+  if (pr && isNum(g.sp)){ const se = +(g.sp - pr.spread).toFixed(1); if (Math.abs(se) >= 2) reasons.push(`The Crab Locks projection likes ${esc(se > 0 ? g.home : g.away)} by ${Math.abs(se)} points more than the market (context only; see its track record above).`); }
+  html += `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Lean <span class="leanb ${L.level}" style="vertical-align:middle;margin-left:6px">${esc(L.text)}</span></h4>${reasons.length ? `<ul class="reasons">${reasons.map(x => `<li>${x}</li>`).join('')}</ul>` : '<div class="muted">No tested systems on this game, and nothing else stands out.</div>'}`;
   const formTable = r => { const list = lastGames(sport, r.team, g.date);
     if (!list.length) return '<div class="muted">No earlier games.</div>';
     return `<table>${list.map(x => `<tr><td>${fmtShort(x.g.date).replace(/^\w+, /, '')}</td><td>${x.H ? 'vs' : '@'} ${esc(x.opp)}</td><td class="${x.mg > 0 ? 'W' : x.mg < 0 ? 'L' : 'P'}">${x.mg > 0 ? 'W' : x.mg < 0 ? 'L' : 'T'} ${x.pf}-${x.pa}</td><td>${isNum(x.atsM) ? `<span class="${x.atsM > 0 ? 'W' : x.atsM < 0 ? 'L' : 'P'}">${x.atsM > 0 ? 'Covered' : x.atsM < 0 ? 'No cover' : 'Push'}</span> ${fmtLine(x.sp)}` : ''}</td></tr>`).join('')}</table>`; };
@@ -2197,6 +2591,39 @@ async function openGame(sport, k){
   }
   $('#gameBody').innerHTML = html;
   $('#dlgGame').showModal();
+  // advanced metrics + injuries
+  (async () => {
+    const M = await loadMetrics(sport), adv = $('#gameAdv');
+    if (adv){
+      if (!M || !M.teams || (!M.teams[g.home] && !M.teams[g.away])) adv.innerHTML = '<div class="muted">Advanced metrics aren’t available for these teams yet. They load with each morning update.</div>';
+      else {
+        const ha = M.teams[g.away] || {}, hh = M.teams[g.home] || {};
+        const rowsHtml = METRIC_ROWS[sport].map(([label, key, hi, fmt]) => {
+          if (!isNum(ha[key]) && !isNum(hh[key])) return '';
+          const rk = hi === null ? null : metricRank(M.teams, key, hi), rt = tm => rk && rk.get(tm) ? ` <span class="muted">#${rk.get(tm)}</span>` : '';
+          const cls = hi === null ? ['',''] : better(ha[key], hh[key], hi);
+          return rowC(label, fmt(ha[key]) + rt(g.away), fmt(hh[key]) + rt(g.home), cls);
+        }).join('');
+        const ml = metricLine(sport, M, g);
+        adv.innerHTML = `<div class="cmp"><div class="a hh">${esc(g.away)}</div><div class="k hh"></div><div class="hh">${esc(g.home)}</div>${rowsHtml}</div>
+          ${ml ? `<div class="pstat" style="margin-top:8px"><div class="k">${ml.label}</div><div class="v">${esc(g.home)} ${fmtLine(Math.round(-ml.margin * 2) / 2)}</div><div class="s">Market ${esc(g.home)} ${fmtLine(g.sp)}. A second projection from the advanced ratings; not backtested yet, so treat it as context.</div></div>` : ''}
+          <div class="note" style="margin-top:4px">${METRIC_NOTE[sport]} Ranks are among all teams this season; green marks the better side.</div>`;
+      }
+    }
+    const I = await loadInjuries(sport), inj = $('#gameInj');
+    if (inj){
+      if (!I) inj.innerHTML = `<div class="muted">${sport === 'NCAAF' || sport === 'NCAAB' ? 'Injury reports aren’t available for college games; check team news before betting.' : 'Couldn’t load the injury report right now.'}</div>`;
+      else {
+        const list = tm => { const L = (I.teams || {})[tm] || []; if (!L.length) return '<div class="muted">No players listed.</div>';
+          return `<table class="data"><tbody>${L.slice(0, 12).map(p => `<tr><td><b>${esc(p.pos || '')}</b></td><td>${esc(p.name)}</td><td class="${/out/i.test(p.status) ? 'L' : /doubt/i.test(p.status) ? 'L' : ''}">${esc(p.status)}</td><td class="muted">${esc(p.injury || '')}</td></tr>`).join('')}</tbody></table>${L.length > 12 ? `<div class="note">+${L.length - 12} more</div>` : ''}`; };
+        inj.innerHTML = `<div class="form"><div><h4>${esc(g.away)}</h4>${list(g.away)}</div><div><h4>${esc(g.home)}</h4>${list(g.home)}</div></div>
+          <div class="note">${I.live ? 'Live from ESPN.' : `Official injury report${I.week ? `, week ${I.week}` : ''}, via ${esc(I.source || '')}.`}${!I.live && isNum(I.week) && isNum(g.week) && I.week < g.week ? ` <b>This is last week’s report.</b> The week ${g.week} report comes out Wednesday to Friday and loads with the next update.` : ''} Statuses change up to game time; check before betting.</div>`;
+        // a key injury adds a lean reason
+        const qbs = [g.away, g.home].flatMap(tm => ((I.teams || {})[tm] || []).filter(p => p.pos === 'QB' && /out|doubt|question/i.test(p.status)).map(p => `${tm} QB ${p.name} (${p.status})`));
+        if (qbs.length){ const ul = document.querySelector('#gameBody .reasons'); const li = document.createElement('li'); li.innerHTML = `<b>Quarterback news:</b> ${esc(qbs.join('; '))}. Lines can move a lot on this.`; if (ul) ul.appendChild(li); }
+      }
+    }
+  })();
   // systems pass (after the sheet is visible)
   const sources = systems.map(s => ({ ...s, kind:'mine' })).concat(PICKS.map(p => ({ ...p, kind:'pick' })));
   const hits = [];
