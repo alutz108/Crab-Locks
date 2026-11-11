@@ -927,7 +927,7 @@ let CFB_LOC = {};  // filled from data/static/cfb_teams.json (built by the daily
 function teamLoc(sport, team, season){
   if (sport === 'NFL') return NFL_LOC[team] || null;
   if (sport === 'NBA'){ if (team === 'Hornets' && season <= 2012) return NBA_LOC.Pelicans; return NBA_LOC[team] || null; }
-  if (sport === 'NCAAF') return CFB_LOC[team] || null;
+  if (sport === 'NCAAF' || sport === 'NCAAB') return CFB_LOC[team] || null;   // same schools; basketball-only schools have no location yet
   return null;
 }
 function miles(a, b){ if (!a || !b) return null; const R = 3959, tr = x => x * Math.PI / 180; const dl = tr(b[0] - a[0]), dn = tr(b[1] - a[1]);
@@ -961,6 +961,8 @@ function addSituations(rows, sport){
       let next = i + 1 < list.length && list[i + 1].g.season === season ? list[i + 1] : null;
       if (next && (r.g.post || next.g.post)) next = null;
       if (next && sport === 'NCAAF' && isNum(next.g.week) && next.g.week >= 14) next = null;   // title games are set by results
+      if (next && (r.g.neu || next.g.neu)) next = null;                                         // tournament / bracket games
+      if (next && sport === 'NCAAB' && [3, 4].includes(Math.floor(next.g.date / 100) % 100)) next = null;   // conference tournaments and March Madness
       r.nextOpp = next ? next.opp : null; r.nextDays = next ? dayNum(next.g.date) - dn : null;
       if (site) prevSite = site; else if (!r.g.neu) prevSite = home;
       prevSeason = season; recent.push(dn);
@@ -1151,13 +1153,13 @@ const CATS = [
     { id:'rest', label:'Team days of rest', type:'range', get:r=>r.rest, step:1, about:'Days since the team’s last game. 1 = back-to-back in basketball; 6–7 is a normal football week.' },
     { id:'oRest', label:'Opponent days of rest', type:'range', get:r=>r.oRest, step:1, about:'Days since the opponent’s last game.' },
     { id:'restAdv', label:'Rest advantage', type:'range', get:r=>r.restAdv, step:1, about:'Team’s rest minus opponent’s rest. Positive means the team is fresher.' },
-    { id:'travel', label:'Travel since last game (miles)', type:'range', get:r=>r.travel, step:50, need:r=>isNum(r.travel), about:'Miles from where the team last played to this game. Home games after a home game are 0. NFL, NBA and college football (once team locations load).' },
+    { id:'travel', label:'Travel since last game (miles)', type:'range', get:r=>r.travel, step:50, need:r=>isNum(r.travel), about:'Miles from where the team last played to this game. Home games after a home game are 0. NFL, NBA, and college football and basketball (once team locations load; a few basketball-only schools are missing).' },
     { id:'tzMove', label:'Time zones crossed', type:'range', get:r=>r.tzMove, step:1, need:r=>isNum(r.tzMove), about:'Time zones moved since the last game. Positive = traveled east (e.g. a West Coast team flying east is +3), negative = traveled west.' },
     { id:'altitude', label:'Playing at altitude', type:'choice', opts:[['any','Any'],['yes','Visiting altitude (4,000+ ft)'],['no','Not at altitude']], test:(r,v)=> r.altitude === (v==='yes' ? 1 : 0), need:r=>r.altitude !== null && r.altitude !== undefined, about:'A team from low elevation playing in Denver or Salt Lake City. Visitors are said to tire faster at altitude.' },
     { id:'spot', label:'Schedule spot', type:'choice', opts:[['any','Any'],['bye','Off a bye / long rest (10+ days)'],['short','Short week (5 or fewer days)'],['3in4','3rd game in 4 nights'],['b2bLong','Back-to-back after travel (500+ mi)']], test:(r,v)=> v==='bye' ? r.rest >= 10 : v==='short' ? isNum(r.rest) && r.rest <= 5 : v==='3in4' ? r.in4 >= 3 : r.rest === 1 && r.travel >= 500, about:'Common scheduling spots. Byes and short weeks matter most in football; 3-in-4 and back-to-backs after travel in basketball.' },
     { id:'revenge', label:'Revenge game', type:'choice', opts:[['any','Any'],['yes','Lost the last meeting'],['no','Won the last meeting']], test:(r,v)=> r.revenge === (v==='yes' ? 1 : 0), need:r=>r.revenge !== null && r.revenge !== undefined, about:'Whether the team lost its most recent game against this opponent (any earlier season counts).' },
     { id:'letdown', label:'Letdown spot', type:'choice', opts:[['any','Any'],['yes','Coming off an upset win (as a 3+ pt dog)'],['no','Not off an upset win']], test:(r,v)=> r.letdown === (v==='yes' ? 1 : 0), need:r=>r.letdown !== null && r.letdown !== undefined, about:'Teams coming off a big upset are often overvalued next time out, or play flat.' },
-    { id:'lookahead', label:'Look-ahead spot', type:'choice', opts:[['any','Any'],['yes','Next opponent is strong (65%+ win rate)'],['no','Next opponent isn’t strong']], test:(r,v)=> isNum(r.nextWp) ? (v==='yes' ? r.nextWp >= 65 : r.nextWp < 65) : false, need:r=>isNum(r.nextWp), about:'The team’s next game (within 9 days) is against a strong opponent, a classic spot for overlooking this one.' },
+    { id:'lookahead', label:'Look-ahead spot', type:'choice', opts:[['any','Any'],['yes','Next opponent is strong (65%+ win rate)'],['no','Next opponent isn’t strong']], test:(r,v)=> isNum(r.nextWp) ? (v==='yes' ? r.nextWp >= 65 : r.nextWp < 65) : false, need:r=>isNum(r.nextWp), about:'The team’s next game (within 9 days) is against a strong opponent, a classic spot for overlooking this one. Only uses games scheduled in advance (no playoff, tournament or title games).' },
     { id:'b2b', label:'Back-to-back', type:'choice', opts:[['any','Any'],['team','Team on a back-to-back'],['opp','Opponent on a back-to-back'],['both','Both'],['none','Neither']], test:(r,v)=>{ const t = r.rest === 1, o = r.oRest === 1; return v==='team' ? t : v==='opp' ? o : v==='both' ? t && o : !t && !o; }, need:r=>r.rest===1, about:'Games on consecutive days. Mostly a basketball filter.' },
   ]},
   { id:'wx', name:'Weather', icon:'wx', filters:[
@@ -1608,7 +1610,7 @@ async function ensureSport(sport){
   if (data.rows[sport]) return;
   try{ await loadRemote(sport); }catch(e){ toast('Couldn’t load game data. Check your connection and reload.'); remote.games[sport] = []; }
   try{ await loadImported(sport); }catch(e){ data.imported[sport] = []; }
-  if (sport === 'NCAAF' && !Object.keys(CFB_LOC).length){ try{ const ct = await fetchJSON('data/static/cfb_teams.json', remote.index?.updated); CFB_LOC = ct.teams || {}; }catch(e){} }
+  if ((sport === 'NCAAF' || sport === 'NCAAB') && !Object.keys(CFB_LOC).length){ try{ const ct = await fetchJSON('data/static/cfb_teams.json', remote.index?.updated); CFB_LOC = ct.teams || {}; }catch(e){} }
   data.rows[sport] = addSituations(buildRows(gamesFor(sport)), sport);
 }
 async function setSport(sport){
@@ -2175,7 +2177,7 @@ $('#boardPicks').addEventListener('change', renderBoard);
 $('#boardExp').addEventListener('change', renderBoard);
 
 /* ---------- app version, refresh and update checks ---------- */
-const APP_VERSION = '2026.11.11-2';
+const APP_VERSION = '2026.11.11-3';
 function hardRefresh(){ location.replace(location.pathname + '?v=' + Date.now()); }
 function fmtUpdated(iso){
   const d = new Date(iso); if (isNaN(d)) return '';
