@@ -2378,7 +2378,7 @@ async function renderGames(){
     if (!rows.length) continue;
     const RT = seasonRatings(sp);
     const I = sp === 'NFL' ? await loadInjuries('NFL') : null;
-    const MD = (sp === 'NFL' || sp === 'NCAAF') ? await loadModel(sp) : null;
+    const MD = (sp === 'NFL' || sp === 'NCAAF' || sp === 'NCAAB') ? await loadModel(sp) : null;
     rows.forEach(r => items.push({ sp, r, RT, I, MD }));
   }
   if (!items.length){ host.innerHTML = `<div class="empty">No games with lines ${gamesDays === 0 ? 'today' : gamesDays === 1 ? 'tomorrow' : 'in the next 7 days'}${gamesSport === 'ALL' ? '' : ' for ' + SPORT_NAMES[gamesSport]}. Lines load with each daily update.</div>`; return; }
@@ -2520,13 +2520,13 @@ async function openGame(sport, k){
       <div class="note" style="margin-top:-6px">From Playbook’s last snapshot before the game.</div>`;
   }
   // Crab Locks model (NFL, NCAAF)
-  const MD = (sport === 'NFL' || sport === 'NCAAF') ? await loadModel(sport) : null, ML = modelLine(MD, g);
+  const MD = (sport === 'NFL' || sport === 'NCAAF' || sport === 'NCAAB') ? await loadModel(sport) : null, ML = modelLine(MD, g);
   if (ML){
     const se = +(ML.ats).toFixed(1), te = +(ML.dtot).toFixed(1);
     html += `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Crab Locks model</h4>
       <div class="proj"><div class="pstat"><div class="k">Model spread</div><div class="v">${esc(g.home)} ${fmtLine(ML.sp)}</div><div class="s">Market ${esc(g.home)} ${fmtLine(g.sp)} · ${Math.abs(se) < 0.5 ? 'agrees with the market' : `likes ${esc(se > 0 ? g.home : g.away)} by ${Math.abs(se)}`}</div><div class="s">${esc(modelRecordText(MD, 'ats', se))}</div></div>
       <div class="pstat"><div class="k">Model total</div><div class="v">${ML.tot}</div><div class="s">Market ${isNum(g.tot) ? g.tot : '–'} · ${Math.abs(te) < 0.5 ? 'agrees with the market' : `${Math.abs(te)} ${te > 0 ? 'higher' : 'lower'}`}</div><div class="s">${esc(modelRecordText(MD, 'tot', te))}</div></div></div>
-      <div class="note" style="margin-top:-4px">Uses play-by-play efficiency (EPA, success rate, passing matchups, last 4 games), score-based ratings, rest, home field, ${sport === 'NFL' ? 'division games and weather' : 'and conference games'}, all as of game day, and starts from the market line. In walk-forward testing it never cleared the bar for a lean, so it’s shown for context: when it disagrees, check the news for why.</div>`;
+      <div class="note" style="margin-top:-4px">${sport === 'NCAAB' ? 'Uses possession-based efficiency adjusted for opponent and home court, pace, the four factors, last 5 games, score-based ratings, rest and conference games' : `Uses play-by-play efficiency (EPA, success rate, passing matchups, last 4 games), score-based ratings, rest, home field, ${sport === 'NFL' ? 'division games and weather' : 'and conference games'}`}, all as of game day, and starts from the market line. In walk-forward testing it never cleared the bar for a lean, so it’s shown for context: when it disagrees, check the news for why.${MD.games[g.date + '|' + g.home + '|' + g.away]?.thin ? ' <b>Limited data:</b> early season or a neutral site, so this projection is less reliable than usual.' : ''}</div>`;
   }
   // projection + comparison
   const RT = seasonRatings(sport), pr = project(sport, RT.R, g);
