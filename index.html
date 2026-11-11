@@ -766,7 +766,8 @@ async function loadRemote(sport){
     try{
       const wj = await fetchJSON(`data/weather/${sport}.json`, v);
       for (const g of games){ if (isNum(g.hs)) continue; const w = wj.games[g.date + '|' + g.home + '|' + g.away]; if (!w) continue;
-        g.wx = w; if (!w.dome && isNum(w.wind)){ g.wind = w.wind; g.temp = w.temp; } }
+        const indoor = w.dome || (sport === 'NFL' && ['ATL','ARI','DAL','DET','HOU','IND','LV','LA','LAC','MIN','NO'].includes(g.home));
+        g.wx = indoor ? { dome: true } : w; if (!indoor && isNum(w.wind)){ g.wind = w.wind; g.temp = w.temp; } }
     }catch(err){}
   }
   if (ent.best){
@@ -1885,9 +1886,10 @@ function statBox(label, sub, r){
   return `<div class="pstat"><div class="k">${label}</div><div class="v ${r.U > 0 ? 'W' : r.U < 0 ? 'L' : ''}">${money(r.U)}</div><div class="s">${r.W}-${r.L}${r.P ? '-' + r.P : ''} (${pct(r.W, n)}), ROI ${r.n ? (r.U / r.n * 100).toFixed(1) + '%' : '–'}</div><div class="s">${sub}</div></div>`;
 }
 async function renderPicks(){
-  $('#pickTabs').innerHTML = `<button data-ps="TOP" aria-pressed="${pickSport === 'TOP'}">🏆 Top 10</button>` + ['NFL','NCAAF','NBA','NCAAB'].map(s => `<button data-ps="${s}" aria-pressed="${s === pickSport}">${SPORT_NAMES[s]} (${PICKS.filter(p => p.sport === s && p.tier !== 'exp').length}<span class="muted"> + ${PICKS.filter(p => p.sport === s && p.tier === 'exp').length}</span>)</button>`).join('');
+  $('#pickTabs').innerHTML = `<button data-ps="TOP" aria-pressed="${pickSport === 'TOP'}">🏆 Top 10</button><button data-ps="PROOF" aria-pressed="${pickSport === 'PROOF'}">📊 Proof</button>` + ['NFL','NCAAF','NBA','NCAAB'].map(s => `<button data-ps="${s}" aria-pressed="${s === pickSport}">${SPORT_NAMES[s]} (${PICKS.filter(p => p.sport === s && p.tier !== 'exp').length}<span class="muted"> + ${PICKS.filter(p => p.sport === s && p.tier === 'exp').length}</span>)</button>`).join('');
   const host = $('#pickList');
   host.innerHTML = '<div class="empty">Running the systems…</div>';
+  if (pickSport === 'PROOF'){ host.innerHTML = await proofHtml(); return; }
   const top = pickSport === 'TOP';
   const list = top ? TOP10.map(id => PICKS.find(p => p.id === id)).filter(Boolean) : PICKS.filter(p => p.sport === pickSport);
   for (const s of [...new Set(list.map(p => p.sport))]){ await ensureSport(s); await tick(); }
@@ -1966,6 +1968,7 @@ function openLog(p){
   $('#logLine').value = isNum(line) ? line : '';
   $('#logOdds').value = isNum(odds) ? odds : -110;
   $('#logGame').textContent += book ? ` · best line at ${book}` : '';
+  const PL = priceLimit(p); $('#logGame').textContent += PL ? ` · price limit: ${PL.text}` : '';
   $('#logStake').value = $('#logStake').value || 100;
   $('#dlgLog').showModal();
 }
@@ -1975,6 +1978,7 @@ $('#logGo').addEventListener('click', async () => {
   if (!isNum(odds) || Math.abs(odds) < 100){ toast('Enter a price like -110 or +150.'); return; }
   if (!(stake > 0)){ toast('Enter how much you risked.'); return; }
   if (logging.bet !== 'ml' && !isNum(line)){ toast('Enter the line you got.'); return; }
+  if (worseThanLimit(logging, line, odds) && !confirm(`That’s worse than the price limit (${priceLimit(logging).text}). The system was tested at the market number, so a worse number gives away much of the edge. Log it anyway?`)) return;
   const b = { id: 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2,5), pid: pickId(logging), sport: logging.sport, k: logging.k, date: logging.date, home: logging.home, away: logging.away,
     bet: logging.bet, side: logging.side, line, odds, stake, systems: logging.systems || [], placed: Date.now() };
   bets.unshift(b);
@@ -2120,6 +2124,74 @@ $('#betsBody').addEventListener('click', async e => {
   renderBets(); recompute();
 });
 
+/* ---------- price limits and key numbers ---------- */
+// Systems were tested at closing lines, so a worse number than today's market gives the edge away.
+const KEYS = { NFL:[3, 7], NCAAF:[3, 7], NBA:[], NCAAB:[] };
+const NFL_INDOOR = new Set(['ATL','ARI','DAL','DET','HOU','IND','LV','LA','LAC','MIN','NO']);   // domes, retractable roofs, SoFi
+function priceLimit(p){
+  const keys = KEYS[p.sport] || [];
+  if (p.bet === 'spread' && isNum(p.line)){
+    let lim = p.line - 0.5;                                        // more points is better: allow half a point worse…
+    if (keys.some(k => Math.abs(p.line) === k || (Math.min(Math.abs(p.line), Math.abs(lim)) < k && Math.max(Math.abs(p.line), Math.abs(lim)) > k))) lim = p.line;  // …unless that gives up a key number
+    return { line: lim, odds: -115, text: `${fmtLine(lim)} or better, at −115 or better` };
+  }
+  if ((p.bet === 'over' || p.bet === 'under') && isNum(p.line)){
+    const lim = p.bet === 'under' ? p.line - 0.5 : p.line + 0.5;
+    return { line: lim, odds: -115, text: `${p.bet === 'under' ? 'Under' : 'Over'} ${lim} or better, at −115 or better` };
+  }
+  if (p.bet === 'ml' && isNum(p.odds)){ const lim = p.odds - 10; return { odds: lim, text: `${fmtOdds(lim)} or better` }; }
+  return null;
+}
+function worseThanLimit(p, line, odds){
+  const L = priceLimit(p); if (!L) return false;
+  if (p.bet === 'spread' && isNum(line) && line < L.line) return true;
+  if (p.bet === 'under' && isNum(line) && line < L.line) return true;
+  if (p.bet === 'over' && isNum(line) && line > L.line) return true;
+  if (isNum(odds) && isNum(L.odds) && odds < L.odds) return true;
+  return false;
+}
+function keyNote(p, g){
+  if (p.bet !== 'spread' || !(KEYS[p.sport] || []).length || !isNum(p.line)) return '';
+  const B = g && g.best, k = B && (p.side === g.home ? B.sp_home : B.sp_away);
+  const crosses = (a, b) => KEYS[p.sport].some(n => Math.min(Math.abs(a), Math.abs(b)) < n + 0.01 && Math.max(Math.abs(a), Math.abs(b)) > n - 0.01 && Math.abs(a) !== Math.abs(b) && (Math.abs(a) === n || Math.abs(b) === n || (Math.min(Math.abs(a), Math.abs(b)) < n && Math.max(Math.abs(a), Math.abs(b)) > n)));
+  if (k && isNum(k[0]) && k[0] > p.line && crosses(p.line, k[0])) return `🔑 Key number: ${fmtLine(k[0])} at ${k[2] ?? k[1] ?? 'another book'} (most books ${fmtLine(p.line)})`;
+  if (KEYS[p.sport].includes(Math.abs(p.line))) return `🔑 On a key number (${Math.abs(p.line)}): don’t give up half a point here`;
+  return '';
+}
+
+/* ---------- opportunities (shown at the top of Today's board) ---------- */
+const MODEL_MOVE_NOTE = { NFL:'When the model disagreed with an opening line in testing (2011–2021), the line moved its way 45% of the time and against it 37%.', NCAAF:'Untested against opening lines; watch whether the line moves its way.', NCAAB:'Untested against opening lines; watch whether the line moves its way.' };
+async function opportunities(start, end){
+  const out = [];
+  for (const sp of ['NFL', 'NCAAF', 'NCAAB']){
+    await ensureSport(sp); await tick();
+    const MD = await loadModel(sp);
+    for (const r of (data.rows[sp] || [])){
+      if (!r.H || r.done || r.g.date < start || r.g.date > end) continue;
+      const g = r.g;
+      // wind: forecast says windy, total hasn't dropped yet
+      if ((sp === 'NFL' || sp === 'NCAAF') && g.wx && !g.wx.dome && !(sp === 'NFL' && NFL_INDOOR.has(g.home)) && isNum(g.wx.wind) && g.wx.wind >= 12 && isNum(g.tot) && (!isNum(g.totO) || g.tot >= g.totO - 0.5)){
+        out.push({ pri: sp === 'NFL' ? 3 : 1, sport: sp, k: g.k, icon:'🌬', title: `Wind alert: ${g.away} @ ${g.home}`, text: `Forecast ${Math.round(g.wx.wind)} mph${isNum(g.wx.gust) ? ` (gusts ${Math.round(g.wx.gust)})` : ''}, total still ${g.tot}${isNum(g.totO) ? ` (opened ${g.totO})` : ''}. ${sp === 'NFL' ? 'Windy unders qualifies: bet before the total drops.' : 'Wind effects are tested in the NFL, not college; treat as context.'}`, date: g.date });
+      }
+      // early line: model disagrees and the line hasn't moved since it opened
+      const ml = MD && modelLine(MD, g), thr = sp === 'NFL' ? 1 : 1.5;
+      if (ml && isNum(g.sp) && Math.abs(ml.ats) >= thr && (!isNum(g.spO) || g.spO === g.sp)){
+        const side = ml.ats > 0 ? g.home : g.away, line = ml.ats > 0 ? g.sp : -g.sp;
+        out.push({ pri: sp === 'NFL' ? 2 : 1, sport: sp, k: g.k, icon:'📈', title: `Early line: ${side} ${fmtLine(line)}`, text: `${g.away} @ ${g.home}. The model likes ${side} by ${Math.abs(ml.ats).toFixed(1)} points more than the market, and the line hasn’t moved yet. ${MODEL_MOVE_NOTE[sp]}`, date: g.date });
+      }
+      // key number available somewhere
+      if ((sp === 'NFL' || sp === 'NCAAF') && g.best && isNum(g.sp)){
+        for (const [team, key, cons] of [[g.home, 'sp_home', g.sp], [g.away, 'sp_away', -g.sp]]){
+          const b = g.best[key]; if (!b || !isNum(b[0]) || b[0] <= cons) continue;
+          if ([3, 7].some(n => (Math.abs(cons) === n && b[0] > cons) || (Math.min(Math.abs(cons), Math.abs(b[0])) < n && Math.max(Math.abs(cons), Math.abs(b[0])) > n)))
+            out.push({ pri: 1, sport: sp, k: g.k, icon:'🔑', title: `Key number: ${team} ${fmtLine(b[0])}`, text: `${g.away} @ ${g.home}. ${b[2] ?? b[1] ?? 'One book'} has ${team} ${fmtLine(b[0])} while most are at ${fmtLine(cons)}. Getting the better side of 3 or 7 is worth more than any other half point.`, date: g.date });
+        }
+      }
+    }
+  }
+  return out.sort((a, b) => b.pri - a.pri || a.date - b.date).slice(0, 8);
+}
+
 /* ---------- Today's board ---------- */
 function publicTag(p){
   const r = gameRows(p.sport, p.k).find(x => p.bet === 'over' || p.bet === 'under' || x.team === p.side);
@@ -2157,19 +2229,27 @@ async function renderBoard(){
   // conflicts: picks on both sides of the same game and market
   const fam = p => p.bet === 'over' || p.bet === 'under' ? 'tot' : 'side';
   list.forEach(it => { it.conflict = list.some(o => o !== it && o.p.sport === it.p.sport && o.p.k === it.p.k && fam(o.p) === fam(it.p) && o.p.side !== it.p.side); });
-  if (!list.length){ host.innerHTML = `<div class="empty">No games fit your systems ${boardDays ? 'in this window' : 'today'}. Try Next 3 days, or check back after the next data update.</div>`; return; }
+  if (!list.length){ host.innerHTML = (await oppHtml(TODAY, end)) + `<div class="empty">No games fit your systems ${boardDays ? 'in this window' : 'today'}. Try Next 3 days, or check back after the next data update.</div>`; return; }
   list.sort((a,b) => a.p.date - b.p.date || (b.crabs || 0) - (a.crabs || 0) || b.srcs.length - a.srcs.length);
-  let html = '', day = null;
+  let html = await oppHtml(TODAY, end), day = null;
   for (const it of list){
     if (it.p.date !== day){ day = it.p.date; html += `<div class="dayhead">${day === TODAY ? 'Today, ' : ''}${fmtShort(day)}</div>`; }
     const i = regPick(it.p);
     html += `<div class="board-item${it.conflict ? ' conflict' : ''}"><div ${gameAttrs(it.p.sport, it.p.k)}><div class="crabs" title="${crabName(it.crabs)}">${crabStr(it.crabs)} <span class="muted" style="font-size:12px;font-weight:600">${crabName(it.crabs)}</span></div><div class="pick">${esc(pickText(it.p))}</div><div class="meta">${SPORT_NAMES[it.p.sport]}: ${esc(it.p.away)} @ ${esc(it.p.home)}${publicTag(it.p)}</div></div>
       <div class="right"><div class="odds">${fmtOdds(it.p.odds)}</div>${logButton(i)}</div>
       <div class="sys">${it.srcs.map(s => `<span class="chip${s.kind === 'pick' ? ' pick-chip' : ''}">${s.kind === 'pick' ? '🦀 ' : ''}${esc(s.name)}<span class="gr">${s.grade === 'x' ? '' : s.grade}</span></span>`).join('')}</div>
+      ${(() => { const L = priceLimit(it.p), kn = keyNote(it.p, gameOf(it.p.sport, it.p.k)); return `<div class="sys" style="font-size:13px;color:var(--muted)">${L ? `Price limit: <b>${esc(L.text)}</b>` : ''}${kn ? `<span style="width:100%">${esc(kn)}</span>` : ''}</div>`; })()}
       ${it.conflict ? '<div class="warn">Conflict: another system is on the other side of this game.</div>' : ''}</div>`;
   }
   html += '<div class="note">Prices are from the latest data update. Check your sportsbook before betting. Letter grades are each system’s overall grade.</div>';
   host.innerHTML = html;
+}
+async function oppHtml(start, end){
+  let ops = [];
+  try{ ops = await opportunities(start, end); }catch(e){}
+  if (!ops.length) return '';
+  return `<div class="about" style="display:grid;gap:8px;border-color:var(--accent-fill)"><h4>Opportunities</h4>${ops.map(o => `<div ${gameAttrs(o.sport, o.k)} style="display:grid;gap:2px"><div class="pick" style="font-weight:700">${o.icon} ${esc(o.title)} <span class="muted" style="font-weight:500;font-size:12px">${SPORT_NAMES[o.sport]} · ${fmtShort(o.date)}</span></div><div class="muted" style="font-size:13px">${esc(o.text)}</div></div>`).join('')}
+    <div class="note" style="margin:0">Spots worth acting on before the market moves. Only wind on NFL totals is a tested edge; the rest are worth a look, then track whether the line moves your way.</div></div>`;
 }
 $('#openBoard').addEventListener('click', () => openView('board'));
 $('#boardRange').addEventListener('click', e => { const b = e.target.closest('[data-d]'); if (!b) return; boardDays = +b.dataset.d; $('#boardRange').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderBoard(); });
@@ -2177,7 +2257,7 @@ $('#boardPicks').addEventListener('change', renderBoard);
 $('#boardExp').addEventListener('change', renderBoard);
 
 /* ---------- app version, refresh and update checks ---------- */
-const APP_VERSION = '2026.11.11-3';
+const APP_VERSION = '2026.11.11-4';
 function hardRefresh(){ location.replace(location.pathname + '?v=' + Date.now()); }
 function fmtUpdated(iso){
   const d = new Date(iso); if (isNaN(d)) return '';
@@ -2492,6 +2572,44 @@ function crabRecord(sports){
   return tally;
 }
 const CRAB_BACKTEST = { 4:{ rec:'140-95', pct:59.6, roi:22.3, n:236 }, 3:{ rec:'278-226', pct:55.2, roi:8.5, n:521 }, 2:{ rec:'1238-1045', pct:54.2, roi:7.3, n:2314 } };
+async function proofHtml(){
+  const sources = PICKS.filter(p => p.tier !== 'exp').map(p => ({ ...p, kind:'pick' })).concat(systems.map(s => ({ ...s, kind:'mine' })));
+  const rowsOut = [];
+  for (const sp of ['NFL','NCAAF','NBA','NCAAB']){
+    await ensureSport(sp); await tick();
+    const cur = (data.rows[sp] || []).reduce((m, r) => Math.max(m, r.g.season), 0);
+    for (const s of sources.filter(x => x.sport === sp)){
+      const f = JSON.parse(JSON.stringify(s.f || {})); migrateFor(f, sp); f.season = [String(cur)];
+      const res = evaluate({ sport: sp, bet: s.bet, fade: !!s.fade, hideDup: !!s.hideDup, f });
+      const L = res.bets.filter(b => b.r.g.date >= CRAB_START);
+      const W = L.filter(b => b.res === 'W').length, Lo = L.filter(b => b.res === 'L').length, P = L.length - W - Lo, U = L.reduce((a, b) => a + b.u, 0);
+      let ep = 0, ev = 0; L.forEach(b => { if (b.res !== 'P'){ const q = implied(b.odds); ep += q; ev += q * (1 - q); } });
+      const z = ev > 0 ? (W - ep) / Math.sqrt(ev) : 0;
+      // open-to-close: how much the line moved in the pick's favor after it opened
+      const tot = s.bet === 'over' || s.bet === 'under', eff = effBet(s.bet, !!s.fade);
+      const mv = L.map(b => tot ? (isNum(b.r.g.totO) && isNum(b.r.g.tot) ? (eff === 'under' ? b.r.g.totO - b.r.g.tot : b.r.g.tot - b.r.g.totO) : null) : (isNum(b.side.spO) && isNum(b.side.sp) ? b.side.spO - b.side.sp : null)).filter(isNum);
+      const clv = mv.length ? mv.reduce((a, x) => a + x, 0) / mv.length : null;
+      // your own logged bets on this system
+      const mine = bets.filter(b => (b.systems || []).includes(s.name)).map(b => gradeBet(b)).filter(gb => gb && isNum(gb.clv));
+      const myClv = mine.length ? mine.reduce((a, x) => a + x.clv, 0) / mine.length : null;
+      const n = W + Lo;
+      let verdict = 'Too early', cls = 'none';
+      if (n >= 30){
+        if ((mv.length >= 20 && clv >= 0.3) || z >= 1.5){ verdict = 'Proving out'; cls = 'hi'; }
+        else if ((mv.length >= 20 && clv <= -0.3 && z <= 0) || z <= -1.5){ verdict = 'Not working'; cls = 'split'; }
+        else { verdict = 'Inconclusive'; cls = 'md'; }
+      }
+      rowsOut.push({ s, sp, W, Lo, P, U, n, clv, mvN: mv.length, myClv, myN: mine.length, verdict, cls });
+    }
+  }
+  rowsOut.sort((a, b) => b.n - a.n);
+  const fmtC = (v, n) => isNum(v) ? `<span class="${v > 0 ? 'W' : v < 0 ? 'L' : ''}">${v > 0 ? '+' : ''}${v.toFixed(2)}</span> <span class="muted">(${n})</span>` : '–';
+  return `<div class="about" style="display:grid;gap:6px"><h4>Proof dashboard</h4>
+    <p>Live results for every Crab Pick and your saved systems since ${fmtDate(CRAB_START)}, graded automatically. Two ways to judge them:</p>
+    <p style="margin:0">• <b>Record</b>: wins and losses. Proving a real 55% system this way takes about 1,400 bets.<br>• <b>Line movement</b>: whether the line moved toward the pick between open and close (points). Consistently positive usually means a real edge, and it shows up in about 150–300 bets.</p>
+    <p class="note" style="margin:0">Verdicts start after 30 decided bets. <b>Proving out</b>: line movement averages +0.3 or better, or the record is clearly above break-even. <b>Not working</b>: both clearly negative. Otherwise <b>Inconclusive</b>. Your own logged bets show how your actual numbers compared with the close.</p></div>
+    <div class="tscroll"><table class="data"><thead><tr><th>System</th><th class="num">Live record</th><th class="num">Units</th><th class="num">Line moved our way</th><th class="num">Your bets vs close</th><th>Verdict</th></tr></thead><tbody>${rowsOut.map(r => `<tr><td>${r.s.kind === 'pick' ? '🦀 ' : ''}${esc(r.s.name)} <span class="muted">${SPORT_NAMES[r.sp]}</span></td><td class="num">${r.W}-${r.Lo}${r.P ? '-' + r.P : ''}</td><td class="num ${r.U > 0 ? 'W' : r.U < 0 ? 'L' : ''}">${fmtU(r.U)}</td><td class="num">${fmtC(r.clv, r.mvN)}</td><td class="num">${fmtC(r.myClv, r.myN)}</td><td><span class="leanb ${r.cls}">${r.verdict}${r.verdict === 'Too early' ? ` (${r.n}/30)` : ''}</span></td></tr>`).join('')}</tbody></table></div>`;
+}
 function crabScaleBox(sports){
   const T = crabRecord(sports);
   const row = n => { const t = T[n], d = t[0] + t[1]; return `<tr><td>${crabStr(n)} <span class="muted">${crabName(n)}</span></td><td class="num">${d + t[2] ? `${t[0]}-${t[1]}${t[2] ? '-' + t[2] : ''}` : '–'}</td><td class="num">${d ? (t[0] / d * 100).toFixed(0) + '%' : '–'}</td><td class="num">${CRAB_BACKTEST[n] ? `${CRAB_BACKTEST[n].rec} (${CRAB_BACKTEST[n].pct}%)` : n === 5 ? 'none yet' : '–'}</td></tr>`; };
@@ -2532,7 +2650,7 @@ async function renderGames(){
       <div class="mu"><span class="pick">${esc(g.away)} <small>${rk(g.away)}</small> @ ${esc(g.home)} <small>${rk(g.home)}</small></span><span class="leanb ${lean.level}">${esc(lean.text)}</span></div>
       <div class="ln"><span><b>${esc(g.home)} ${fmtLine(g.sp)}</b>${mv}</span><span>Total <b>${isNum(g.tot) ? g.tot : '–'}</b></span>${isNum(H.ml) && isNum(A?.ml) ? `<span>ML ${esc(g.away)} ${fmtOdds(A.ml)} / ${esc(g.home)} ${fmtOdds(H.ml)}</span>` : ''}${pub}</div>
       ${it.I ? (() => { const q = [g.away, g.home].flatMap(tm => ((it.I.teams || {})[tm] || []).filter(p => p.pos === 'QB' && /out|doubt|question/i.test(p.status)).map(p => `${tm} QB ${p.status.toLowerCase()}`)); return q.length ? `<div class="md" style="color:var(--loss);font-weight:600">⚠ ${esc(q.join(' · '))}</div>` : ''; })() : ''}
-      ${g.wx && !g.wx.dome && isNum(g.wx.wind) && g.wx.wind >= 12 ? `<div class="md" style="font-weight:600">🌬 Forecast wind ${Math.round(g.wx.wind)} mph${isNum(g.wx.temp) ? `, ${Math.round(g.wx.temp)}°F` : ''}</div>` : ''}
+      ${g.wx && !g.wx.dome && !(it.sp === 'NFL' && NFL_INDOOR.has(g.home)) && isNum(g.wx.wind) && g.wx.wind >= 12 ? `<div class="md" style="font-weight:600">🌬 Forecast wind ${Math.round(g.wx.wind)} mph${isNum(g.wx.temp) ? `, ${Math.round(g.wx.temp)}°F` : ''}</div>` : ''}
       ${g.best && g.best.sp_home && g.best.sp_away ? `<div class="md">Best lines: ${esc(g.away)} ${fmtLine(g.best.sp_away[0])} <span class="muted">${esc(g.best.sp_away[2] ?? g.best.sp_away[1] ?? '')}</span> · ${esc(g.home)} ${fmtLine(g.best.sp_home[0])} <span class="muted">${esc(g.best.sp_home[2] ?? g.best.sp_home[1] ?? '')}</span></div>` : ''}
       <div class="md">${(() => { const ml = modelLine(it.MD, g); if (ml) return `Crab Locks model: ${esc(g.home)} ${fmtLine(ml.sp)}, total ${ml.tot}`; return pr ? `Crab Locks line: ${esc(g.home)} ${fmtLine(Math.round(pr.spread * 2) / 2)}, total ${Math.round(pr.total * 2) / 2}` : 'Not enough games for a projection yet'; })()}${sysN ? ` · ${sysN} system${sysN === 1 ? '' : 's'} on this game` : ''}</div></div>`;
   }
@@ -2660,7 +2778,7 @@ async function openGame(sport, k){
       <div class="note" style="margin-top:-6px">The best number and price across sportsbooks at the last update. Half a point or 10 cents of juice adds up over a season; check that the line is still there before betting.</div>`;
   }
   if (g.wx && !H.done){
-    const W = g.wx;
+    const W = (sport === 'NFL' && NFL_INDOOR.has(g.home)) ? { dome: true } : g.wx;
     html += W.dome ? `<div class="note">🏟️ Indoors: weather won’t matter.</div>` : `<h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Weather forecast</h4>
       <div class="proj"><div class="pstat"><div class="k">Wind</div><div class="v ${W.wind >= 12 ? 'L' : ''}">${Math.round(W.wind)} mph</div><div class="s">${isNum(W.gust) ? `Gusts to ${Math.round(W.gust)} mph` : ''}${W.wind >= 12 ? ' · windy-unders territory' : ''}</div></div>
       <div class="pstat"><div class="k">Temperature</div><div class="v">${Math.round(W.temp)}°F</div><div class="s">${W.temp < 32 ? 'Freezing' : W.temp < 45 ? 'Cold' : ''}</div></div>
