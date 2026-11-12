@@ -10,13 +10,16 @@ on:
     - cron: "0 16 * * 0"
     # Saturday 10 AM Eastern: college football before the noon kickoffs
     - cron: "0 15 * * 6"
+    # FanDuel NFL line checks on game days: Sunday 2:30 PM, Thursday and Monday 5:30 PM Eastern
+    - cron: "30 19 * * 0"
+    - cron: "30 22 * * 1,4"
   workflow_dispatch:
     inputs:
       mode:
         description: "full = everything, odds = basketball lines only, nfl = NFL only, cfb = college football only, test = print samples and save nothing, archive = one-time college archive import"
         default: "full"
         type: choice
-        options: [full, odds, nfl, cfb, test, archive-test, archive]
+        options: [full, odds, nfl, cfb, nfl-odds, test, archive-test, archive]
 
 permissions:
   contents: write
@@ -44,7 +47,7 @@ jobs:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           PLAYBOOK_API_KEY: ${{ secrets.PLAYBOOK_API_KEY }}
-          MODE: ${{ github.event.inputs.mode || (github.event.schedule == '30 21 * * *' && 'odds') || (github.event.schedule == '0 16 * * 0' && 'nfl') || (github.event.schedule == '0 15 * * 6' && 'cfb') || 'full' }}
+          MODE: ${{ github.event.inputs.mode || (github.event.schedule == '30 21 * * *' && 'odds') || (github.event.schedule == '0 16 * * 0' && 'nfl') || (github.event.schedule == '0 15 * * 6' && 'cfb') || ((github.event.schedule == '30 19 * * 0' || github.event.schedule == '30 22 * * 1,4') && 'nfl-odds') || 'full' }}
         run: |
           case "$MODE" in
             test) python scripts/update.py --test ;;
@@ -53,6 +56,7 @@ jobs:
             odds) python scripts/update.py --sports NBA,NCAAB --odds-only ;;
             nfl)  python scripts/update.py --sports NFL ;;
             cfb)  python scripts/update.py --sports NCAAF ;;
+            nfl-odds) python scripts/update.py --sports NFL --odds-only ;;
             *)    python scripts/update.py ;;
           esac
 
