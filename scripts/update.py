@@ -1527,8 +1527,6 @@ def main():
     for sp, pull, first in (("NCAAF", pull_cfb_season, 2013), ("NCAAB", pull_cbb_season, 2013)):
             if sp not in sports:
                 continue
-            if args.odds_only and sp != "NCAAB":
-                continue
             if not CFBD_KEY:
                 say(f"  {sp}: no CFBD_API_KEY, skipping")
                 continue
