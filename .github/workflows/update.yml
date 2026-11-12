@@ -6,13 +6,17 @@ on:
     - cron: "0 11 * * *"
     # 21:30 UTC = 4:30 PM Eastern: NBA and college basketball lines before tonight's games
     - cron: "30 21 * * *"
+    # Sunday 11 AM Eastern: NFL lines, injuries and weather before the 1 PM kickoffs
+    - cron: "0 16 * * 0"
+    # Saturday 10 AM Eastern: college football before the noon kickoffs
+    - cron: "0 15 * * 6"
   workflow_dispatch:
     inputs:
       mode:
-        description: "full = everything, odds = NBA/NFL lines snapshot only, test = print samples and save nothing, archive = one-time college archive import"
+        description: "full = everything, odds = basketball lines only, nfl = NFL only, cfb = college football only, test = print samples and save nothing, archive = one-time college archive import"
         default: "full"
         type: choice
-        options: [full, odds, test, archive-test, archive]
+        options: [full, odds, nfl, cfb, test, archive-test, archive]
 
 permissions:
   contents: write
@@ -40,13 +44,15 @@ jobs:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           PLAYBOOK_API_KEY: ${{ secrets.PLAYBOOK_API_KEY }}
-          MODE: ${{ github.event.inputs.mode || (github.event.schedule == '30 21 * * *' && 'odds' || 'full') }}
+          MODE: ${{ github.event.inputs.mode || (github.event.schedule == '30 21 * * *' && 'odds') || (github.event.schedule == '0 16 * * 0' && 'nfl') || (github.event.schedule == '0 15 * * 6' && 'cfb') || 'full' }}
         run: |
           case "$MODE" in
             test) python scripts/update.py --test ;;
             archive-test) python scripts/update.py --archive --test --sports NCAAF,NCAAB ;;
             archive) python scripts/update.py --archive --sports NCAAF,NCAAB ;;
             odds) python scripts/update.py --sports NBA,NCAAB --odds-only ;;
+            nfl)  python scripts/update.py --sports NFL ;;
+            cfb)  python scripts/update.py --sports NCAAF ;;
             *)    python scripts/update.py ;;
           esac
 
