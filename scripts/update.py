@@ -278,7 +278,60 @@ def pull_cbb_season(season, test=False):
     return check_sign(list(games.values()), f"NCAAB {season}")
 
 # ------------------------------------------------------------------ The Odds API (NFL, NBA)
-ODDS_SPORT = {"NFL": "americanfootball_nfl", "NBA": "basketball_nba"}
+ODDS_SPORT = {"NFL": "americanfootball_nfl", "NBA": "basketball_nba", "NCAAF": "americanfootball_ncaaf", "NCAAB": "basketball_ncaab"}
+
+# ---- FanDuel lines (the user's sportsbook). Stored per game so the app can use FanDuel's numbers everywhere.
+def fanduel_lines(ev):
+    home, away = ev["home_team"], ev["away_team"]
+    bk = next((b for b in ev.get("bookmakers", []) if b.get("key") == "fanduel"), None)
+    if not bk: return None
+    out = {}
+    for m in bk.get("markets", []):
+        oc = {o.get("name"): o for o in m.get("outcomes", [])}
+        if m.get("key") == "spreads" and oc.get(home) and oc.get(away):
+            out["sp"] = oc[home].get("point"); out["hso"] = oc[home].get("price"); out["aso"] = oc[away].get("price")
+        elif m.get("key") == "totals" and oc.get("Over"):
+            out["tot"] = oc["Over"].get("point"); out["oo"] = oc["Over"].get("price"); out["uo"] = (oc.get("Under") or {}).get("price")
+        elif m.get("key") == "h2h" and oc.get(home) and oc.get(away):
+            out["hml"] = oc[home].get("price"); out["aml"] = oc[away].get("price")
+    return out or None
+
+def odds_budget(cost, priority="low"):
+    """Keep The Odds API inside the free 500 credits a month: lower-priority calls stop first."""
+    left = STATS.get("odds_credits_left")
+    if left in (None, ""): return True
+    left = int(float(left)); nxt = (TODAY.replace(day=28) + timedelta(days=4)).replace(day=1)
+    days = max(1, (nxt - TODAY).days)
+    reserve = {"high": 4, "mid": 9, "low": 13}[priority] * days   # credits/day kept for the regular schedule
+    return left - cost >= reserve
+
+def fd_college(sport):
+    """FanDuel lines for upcoming college games (team names matched to CollegeFootballData / CollegeBasketballData names)."""
+    if not ODDS_KEY: return
+    if not odds_budget(3, "low"):
+        say(f"  {sport} FanDuel: skipped to stay under the free Odds API credits this month (left: {STATS.get('odds_credits_left')})"); return
+    evs = http_json(f"https://api.the-odds-api.com/v4/sports/{ODDS_SPORT[sport]}/odds?" + urllib.parse.urlencode(
+        {"apiKey": ODDS_KEY, "bookmakers": "fanduel", "markets": "h2h,spreads,totals", "oddsFormat": "american", "dateFormat": "iso"}))
+    y = season_of(sport, TODAY)
+    names = set()
+    for s in (y - 1, y):
+        for g in load(f"api/{sport}/{s}.json", {"games": []})["games"]: names.add(g["home"]); names.add(g["away"])
+    names = sorted(names, key=len, reverse=True)
+    def ours(full):
+        if full in names: return full
+        best = None
+        for n in names:
+            if full.startswith(n + " ") and (best is None or len(n) > len(best)): best = n
+        return best
+    out, miss = {}, 0
+    for ev in evs or []:
+        fd = fanduel_lines(ev)
+        if not fd: continue
+        h, a = ours(ev["home_team"]), ours(ev["away_team"])
+        if not h or not a: miss += 1; continue
+        out[f"{ymd(ev['commence_time'])}|{h}|{a}"] = fd
+    save(f"odds/fd_{sport}.json", {"updated": NOW.isoformat(timespec="seconds"), "games": out})
+    say(f"  {sport} FanDuel: {len(out)} games ({miss} couldn’t be matched). Odds API credits left: {STATS['odds_credits_left']}")
 NFL_ABBR = {"Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL", "Baltimore Ravens": "BAL", "Buffalo Bills": "BUF",
     "Carolina Panthers": "CAR", "Chicago Bears": "CHI", "Cincinnati Bengals": "CIN", "Cleveland Browns": "CLE",
     "Dallas Cowboys": "DAL", "Denver Broncos": "DEN", "Detroit Lions": "DET", "Green Bay Packers": "GB",
@@ -385,6 +438,12 @@ def odds_update(sport, with_scores, test=False):
                 pass
     say(f"  {sport}: {len(evs or [])} upcoming games priced, {n_new} new openers captured. Odds API credits left: {STATS['odds_credits_left']}")
     if not test:
+        fdo = {}
+        for ev in evs or []:
+            fd = fanduel_lines(ev)
+            if fd: fdo[f"{ymd(ev['commence_time'])}|{short_name(sport, ev['home_team'])}|{short_name(sport, ev['away_team'])}"] = fd
+        save(f"odds/fd_{sport}.json", {"updated": NOW.isoformat(timespec="seconds"), "games": fdo})
+        say(f"  {sport} FanDuel: {len(fdo)} games")
         bl = {}
         for e in track["events"].values():
             if e.get("last") and e["last"].get("best") and not e.get("hs") and e.get("date"):
@@ -1455,7 +1514,8 @@ def write_index(state):
                "injuries": os.path.exists(os.path.join(DATA, "injuries", f"{sport}.json")),
                "model": os.path.exists(os.path.join(DATA, "model", f"{sport}.json")),
                "weather": os.path.exists(os.path.join(DATA, "weather", f"{sport}.json")),
-               "best": os.path.exists(os.path.join(DATA, "odds", f"best_{sport}.json"))}
+               "best": os.path.exists(os.path.join(DATA, "odds", f"best_{sport}.json")),
+               "fd": os.path.exists(os.path.join(DATA, "odds", f"fd_{sport}.json"))}
         for kind in ("api", "archive"):
             d = os.path.join(DATA, kind, sport)
             if os.path.isdir(d):
@@ -1499,6 +1559,8 @@ def main():
     tracks = {}
     for sp in ("NFL", "NBA"):
         if sp in sports:
+            if args.odds_only and sp == "NFL" and not odds_budget(3, "mid"):
+                say("  NFL odds: extra game-day check skipped to stay under the free Odds API credits"); continue
             tracks[sp] = guard(f"{sp} odds", lambda sp=sp: odds_update(sp, with_scores=(sp == "NBA" and not args.odds_only), test=args.test))
     if args.test:
         for sp in [x for x in ("NFL", "NBA", "NCAAF", "NCAAB") if x in sports][:2]:
@@ -1546,6 +1608,9 @@ def main():
                 if s != cur:
                     state["done"].setdefault(sp, []).append(s)
 
+    for sp in ("NCAAB", "NCAAF"):
+        if sp in sports and not args.test:
+            guard(f"{sp} FanDuel", lambda sp=sp: fd_college(sp))
     if not args.odds_only:
         for sp, fn in (("NFL", nfl_metrics), ("NFL", nfl_injuries), ("NBA", nba_metrics), ("NCAAF", cfb_metrics), ("NCAAB", cbb_metrics)):
             if sp in sports and (sp not in ("NCAAF", "NCAAB") or CFBD_KEY):
