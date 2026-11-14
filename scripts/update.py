@@ -1368,6 +1368,7 @@ def model_predictions(sport):
         last = {}
         for s in (y - 1, y):
             for x in load(f"api/NCAAF/{s}.json", {"games": []})["games"]:
+                if x.get("hc") not in M.FBS_CONFS or x.get("ac") not in M.FBS_CONFS: continue   # FBS vs FBS only
                 games[str(x["id"])] = dict(game=str(x["id"]), season=s, order=x["date"], home=x["home"], away=x["away"], hs=x.get("hs"), sp=x.get("sp"), tot=x.get("tot"),
                                            neu=bool(x.get("neu")), conf=bool(x.get("div")))
                 games[str(x["id"])]["as"] = x.get("as")

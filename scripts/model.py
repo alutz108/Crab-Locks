@@ -8,6 +8,9 @@ before it (plus last season, pulled toward average, as a starting point).
 import math
 from collections import defaultdict
 
+# FBS conferences as CollegeFootballData names them (a team's conference is per season, so schools that moved up count from that year)
+FBS_CONFS = {"ACC", "American Athletic", "Big 12", "Big Ten", "Conference USA", "Mid-American", "Mountain West", "Pac-12", "SEC", "Sun Belt", "FBS Independents"}
+
 CFG = {
     "NFL":   {"cap": 28, "lam": 3, "prior": 0.55, "hfa": 1.8, "K": 250},
     "NCAAF": {"cap": 35, "lam": 3, "prior": 0.55, "hfa": 3.0, "K": 300},
