@@ -2463,7 +2463,7 @@ $('#boardPicks').addEventListener('change', renderBoard);
 $('#boardExp').addEventListener('change', renderBoard);
 
 /* ---------- app version, refresh and update checks ---------- */
-const APP_VERSION = '2026.11.16-4';
+const APP_VERSION = '2026.11.16-5';
 function hardRefresh(){ location.replace(location.pathname + '?v=' + Date.now()); }
 function fmtUpdated(iso){
   const d = new Date(iso); if (isNaN(d)) return '';
@@ -3036,25 +3036,40 @@ function propPOver(mean, sd, line, stat){
 }
 function erfc(x){ const z = Math.abs(x), t = 1 / (1 + 0.5 * z); const r = t * Math.exp(-z * z - 1.26551223 + t * (1.00002368 + t * (0.37409196 + t * (0.09678418 + t * (-0.18628806 + t * (0.27886807 + t * (-1.13520398 + t * (1.48851587 + t * (-0.82215223 + t * 0.17087277))))))))); return x >= 0 ? r : 2 - r; }
 const impProb = o => o < 0 ? -o / (-o + 100) : 100 / (o + 100);
+const PROP_MODEL_W = 0.4;   // until the model is tested against saved FanDuel lines, the market gets 60% of the say
 function propEval(P, pj, line, stat, over, under){
   const s = pj && pj[stat]; if (!s) return null;
-  const raw = propPOver(s.mean, s.sd, line, stat), cal = (P.proj && P.proj.cal && P.proj.cal[stat]) || [0, 1];
-  const pOver = Math.max(0.02, Math.min(0.98, cal[0] + cal[1] * raw));
+  const cal = (P.proj && P.proj.cal && P.proj.cal[stat]) || [0, 1];
   let fair = null; if (isNum(over) && isNum(under)){ const a = impProb(over), b = impProb(under); fair = a / (a + b); }
+  const thin = (pj.n || 0) < 8 && !pj.prior;                                   // rookies, call-ups: too little NBA data
+  // the mean the market is implying (normal approximation), blended with the model's
+  const k = Math.floor(line) + 1;
+  // the mean that makes our own chance model match the market's fair chance (solved directly, so it's consistent for every stat)
+  let mktMean = s.mean;
+  if (fair !== null){ let lo = 0, hi = Math.max(5, line * 3 + 10); for (let i = 0; i < 40; i++){ const mid = (lo + hi) / 2; if (propPOver(mid, s.sd, line, stat) < fair) lo = mid; else hi = mid; } mktMean = (lo + hi) / 2; }
+  const blend = fair !== null ? PROP_MODEL_W * s.mean + (1 - PROP_MODEL_W) * mktMean : s.mean;
+  const raw = propPOver(blend, s.sd, line, stat);
+  // keep the calibration's "less confident" slope, centred on 50% (its intercept came from test lines at season averages, which favour unders)
+  const pOver = Math.max(0.02, Math.min(0.98, 0.5 + cal[1] * (raw - 0.5)));
+  const news = fair !== null && Math.abs(s.mean - mktMean) > Math.max(2.0, 0.18 * Math.max(mktMean, 1));   // model and line far apart: usually lineup/injury news
   const side = fair === null ? (pOver >= 0.5 ? 'Over' : 'Under') : (pOver - fair >= (1 - pOver) - (1 - fair) ? 'Over' : 'Under');
   const pSide = side === 'Over' ? pOver : 1 - pOver, price = side === 'Over' ? over : under;
-  const edge = fair === null ? null : pSide - (side === 'Over' ? fair : 1 - fair);
+  let edge = fair === null ? null : pSide - (side === 'Over' ? fair : 1 - fair);
   const ev = isNum(price) ? pSide * (price < 0 ? 100 / -price : price / 100) - (1 - pSide) : null;
-  return { mean: s.mean, sd: s.sd, pOver, fair, side, pSide, edge, ev, opp_f: s.opp_f };
+  if (thin || news) edge = null;     // no edge on thin data or when the line reflects news the model can't see
+  return { mean: s.mean, blend, mktMean, sd: s.sd, pOver, fair, side, pSide, edge, ev: thin || news ? null : ev, opp_f: s.opp_f, thin, news };
 }
 function hitRate(rows, stat, line){ if (!rows.length) return null; const h = rows.filter(r => propValue(r, stat) > line).length; return [h, rows.length]; }
+const lastFirst = n => { const p = String(n).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\b(jr|sr|ii|iii|iv)\b\.?/g, '').replace(/[^a-z ]/g, '').trim().split(/\s+/); return p.length ? p[p.length - 1] + '|' + (p[0] || '')[0] : ''; };
 function findProj(P, key, player){
   const g = P.proj && P.proj.games && P.proj.games[key]; if (!g) return null;
-  return g.players[player] || g.players[Object.keys(g.players).find(n => normName(n) === normName(player)) || ''] || null;
+  const names = Object.keys(g.players);
+  return g.players[player] || g.players[names.find(n => normName(n) === normName(player)) || ''] || g.players[names.find(n => lastFirst(n) === lastFirst(player)) || ''] || null;
 }
 function findPlayer(P, player){
   const pl = P.players && P.players.players; if (!pl) return null;
-  return pl[player] || pl[Object.keys(pl).find(n => normName(n) === normName(player)) || ''] || null;
+  const names = Object.keys(pl);
+  return pl[player] || pl[names.find(n => normName(n) === normName(player)) || ''] || pl[names.find(n => lastFirst(n) === lastFirst(player)) || ''] || null;
 }
 let propStat = 'all', propLeansOnly = false, propQ = '';
 async function renderProps(){
@@ -3086,7 +3101,7 @@ async function renderProps(){
       <div class="mu"><span class="pick">${esc(pr.player)} <small>${esc(pj ? pj.team : '')} ${esc(away)} @ ${esc(home)}</small></span>${e && isNum(e.edge) ? `<span class="leanb ${tier}">${e.side} ${e.edge >= 0 ? '+' : ''}${(e.edge * 100).toFixed(1)}%</span>` : ''}</div>
       <div class="ln"><span><b>${PROP_STAT[pr.stat]} ${pr.line}</b> <span class="muted">${esc(pr.book)} O ${fmtOdds(pr.over)} / U ${fmtOdds(pr.under)}</span></span>${pr.dk && pr.book === 'FanDuel' && pr.dk[0] !== pr.line ? `<span class="muted">DK ${pr.dk[0]}</span>` : ''}</div>
       <div style="display:flex;justify-content:flex-end"><button class="logbtn" data-addprop="${esc(x.key)}|${esc(pr.player)}|${pr.stat}|${e ? e.side : 'Over'}">+ Parlay ${e ? e.side : ''}</button></div>
-      <div class="md">${e ? `Projection <b>${e.mean.toFixed(1)}</b> · ${e.side} ${pct(e.pSide)} vs FanDuel ${e.fair !== null ? pct(e.side === 'Over' ? e.fair : 1 - e.fair) : '–'}` : 'No projection (player not in the rotation data yet)'}${h10 ? ` · Over in ${h10[0]} of last ${h10[1]}` : ''}${x.started ? ' · <b>Started</b>' : ''}</div></div>`;
+      <div class="md">${e ? (e.thin ? `Projection <b>${e.mean.toFixed(1)}</b> · <b>limited data</b> (fewer than 8 NBA games), no edge shown` : e.news ? `Projection <b>${e.mean.toFixed(1)}</b> vs line ${pr.line} · <b style="color:var(--loss)">⚠ check the news</b>: the line likely reflects a role or injury change` : `Projection <b>${e.mean.toFixed(1)}</b> · ${e.side} ${pct(e.pSide)} vs ${esc(pr.book)} ${e.fair !== null ? pct(e.side === 'Over' ? e.fair : 1 - e.fair) : '–'}`) : 'No projection (player not in the rotation data yet)'}${h10 ? ` · Over in ${h10[0]} of last ${h10[1]}` : ''}${x.started ? ' · <b>Started</b>' : ''}</div></div>`;
   }).join('') + `<div class="note">Edges compare Crab Locks’ projection with FanDuel’s price (juice removed). The model’s chances were checked against last season’s results, but it hasn’t been tested against real prop lines yet; lines are being saved daily so that test can happen. Treat 10%+ as worth a look, not a lock.</div>`;
 }
 async function openPlayer(key, player, stat){
@@ -3108,7 +3123,8 @@ async function openPlayer(key, player, stat){
       <div class="about" style="display:grid;gap:6px"><h4>${PROP_STAT[stat]}: line <input id="pLine" type="number" step="0.5" value="${line}" style="width:80px"> ${pr ? `<span class="muted" style="font-weight:400">${esc(pr.book)} O ${fmtOdds(pr.over)} / U ${fmtOdds(pr.under)}</span>` : '<span class="muted" style="font-weight:400">type FanDuel’s line</span>'}</h4>
         ${e ? `<div class="proj"><div class="pstat"><div class="k">Projection</div><div class="v">${e.mean.toFixed(1)}</div><div class="s">${pj.min} minutes · pace ×${pj.pace_f} · opponent ×${e.opp_f}</div></div>
           <div class="pstat"><div class="k">Chance of over</div><div class="v">${Math.round(e.pOver * 100)}%</div><div class="s">Fair odds: Over ${fmtOdds(fairOdds(e.pOver))} / Under ${fmtOdds(fairOdds(1 - e.pOver))}</div></div>
-          <div class="pstat"><div class="k">Edge vs ${pr ? esc(pr.book) : 'line'}</div><div class="v ${e.edge > 0 ? 'W' : ''}">${isNum(e.edge) ? `${e.side} ${e.edge >= 0 ? '+' : ''}${(e.edge * 100).toFixed(1)}%` : '–'}</div><div class="s">${isNum(e.ev) ? `Expected return ${e.ev >= 0 ? '+' : ''}${(e.ev * 100).toFixed(1)}% per bet` : 'Enter prices to compare'}</div></div></div>` : '<div class="muted">No projection for this player tonight (not enough recent minutes).</div>'}
+          <div class="pstat"><div class="k">Edge vs ${pr ? esc(pr.book) : 'line'}</div><div class="v ${e.edge > 0 ? 'W' : ''}">${isNum(e.edge) ? `${e.side} ${e.edge >= 0 ? '+' : ''}${(e.edge * 100).toFixed(1)}%` : '–'}</div><div class="s">${e.thin ? 'Limited data: fewer than 8 NBA games' : e.news ? '⚠ Check the news: the line likely reflects a role or injury change the model can’t see' : isNum(e.ev) ? `Expected return ${e.ev >= 0 ? '+' : ''}${(e.ev * 100).toFixed(1)}% per bet` : 'Enter prices to compare'}</div></div></div>
+          ${e.fair !== null ? `<div class="note" style="margin:0">Model projection ${e.mean.toFixed(1)}; ${esc(pr ? pr.book : 'the line')} implies about ${e.mktMean.toFixed(1)}. The chances above blend the two (40% model, 60% market) until the model is tested against saved lines.</div>` : ''}` : '<div class="muted">No projection for this player tonight (not enough recent minutes).</div>'}
         ${pr && e && line === pr.line ? `<div class="quicklog"><button class="logbtn" data-plog="Over">Log Over ${line} ${fmtOdds(pr.over)}</button><button class="logbtn" data-plog="Under">Log Under ${line} ${fmtOdds(pr.under)}</button><button class="logbtn" data-addprop="${esc(key)}|${esc(pr.player)}|${stat}|Over">+ Parlay Over</button><button class="logbtn" data-addprop="${esc(key)}|${esc(pr.player)}|${stat}|Under">+ Parlay Under</button></div>` : ''}</div>
       <h4 style="margin:4px 0 0;font-family:var(--fd);font-size:18px">Hit rates at ${line}</h4>
       <div class="proj">${hr('Last 5', rows.slice(-5))}${hr('Last 10', rows.slice(-10))}${hr('Last 25', rows.slice(-25))}${hr('Home', rows.filter(r => r[2] === 1).slice(-20))}${hr('Away', rows.filter(r => r[2] === 0).slice(-20))}${hr(`vs ${esc(opp)}`, rows.filter(r => r[1] === opp))}</div>
