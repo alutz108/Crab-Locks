@@ -1581,6 +1581,13 @@ def props_lines(sport, test=False):
     # history: the last pregame snapshot per game is its closing prop line
     for key, g in store["games"].items():
         d = key.split("|")[0]; hp = f"props/hist/{sport}/{d}.json"; h = load(hp, {"games": {}}); h["games"][key] = g; save(hp, h)
+    hist_index(sport)
+
+def hist_index(sport):
+    folder = os.path.join(DATA, "props", "hist", sport)
+    if not os.path.isdir(folder): return
+    dates = sorted({f.split("_")[0].split(".")[0] for f in os.listdir(folder) if f[:8].isdigit()})
+    save(f"props/hist/{sport}/index.json", {"updated": NOW.isoformat(timespec="seconds"), "dates": dates})
 
 def nba_props_data():
     """Player game logs, splits and tonight's projections for the NBA props screen."""
@@ -1640,6 +1647,12 @@ def nba_props_data():
                   "log": [[g["date"], g["opp"], 1 if g["home"] else 0, round(g["min"]), int(g["pts"]), int(g["reb"]), int(g["ast"]), int(g["fg3"])] for g in L[-25:]],
                   "splits": sp}
     save("props/NBA_proj.json", {"updated": NOW.isoformat(timespec="seconds"), "cal": PN.CAL, "games": proj})
+    # history: projections as of the last pregame run, by game date (used to grade prop ratings later)
+    by_date = {}
+    for key, g in proj.items(): by_date.setdefault(key.split("|")[0], {})[key] = g
+    for d, games in by_date.items():
+        hp = f"props/hist/NBA/{d}_proj.json"; h = load(hp, {"games": {}}); h["games"].update(games); h["cal"] = PN.CAL; save(hp, h)
+    hist_index("NBA")
     save("props/NBA_players.json", {"updated": NOW.isoformat(timespec="seconds"), "players": pl})
     say(f"  NBA props data: projections for {sum(len(g['players']) for g in proj.values())} players in {len(proj)} games; logs for {len(pl)} players")
 
