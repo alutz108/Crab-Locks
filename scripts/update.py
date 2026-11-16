@@ -35,6 +35,7 @@ DATA = os.path.join(ROOT, "data")
 CFBD_KEY = os.environ.get("CFBD_API_KEY", "").strip()
 ODDS_KEY = os.environ.get("ODDS_API_KEY", "").strip()
 PLAYBOOK_KEY = os.environ.get("PLAYBOOK_API_KEY", "").strip()
+PROPLINE_KEY = os.environ.get("PROPLINE_API_KEY", "").strip()
 NOW = datetime.now(timezone.utc)
 TODAY = NOW.astimezone(ET).date()
 LOG = []
@@ -1526,6 +1527,122 @@ def weather_cfb():
     save("weather/NCAAF.json", {"updated": NOW.isoformat(timespec="seconds"), "source": "Open-Meteo forecast", "games": out})
     say(f"  NCAAF weather: forecasts for {len(out)} games")
 
+# ------------------------------------------------------------------ player props (NBA): lines from PropLine, projections from box scores
+PL_BASE = "https://api.prop-line.com/v1"
+PL_SPORT = {"NBA": "basketball_nba", "NFL": "americanfootball_nfl"}
+PL_MARKETS = {"NBA": {"player_points": "pts", "player_rebounds": "reb", "player_assists": "ast", "player_threes": "fg3", "player_points_rebounds_assists": "pra"}}
+
+def props_lines(sport, test=False):
+    """FanDuel (DraftKings as a fallback) player props for upcoming games. Lines freeze at tip-off; every pull is kept as history."""
+    if not PROPLINE_KEY:
+        say(f"  {sport} props: no PROPLINE_API_KEY, skipping"); return
+    sk, mk = PL_SPORT[sport], PL_MARKETS[sport]
+    evs = http_json(f"{PL_BASE}/sports/{sk}/events?" + urllib.parse.urlencode({"apiKey": PROPLINE_KEY})) or []
+    if isinstance(evs, dict): evs = evs.get("data") or evs.get("events") or []
+    soon = NOW + timedelta(hours=36); store = load(f"props/{sport}_lines.json", {"games": {}})
+    keep_from = int((TODAY - timedelta(days=3)).strftime("%Y%m%d"))
+    store["games"] = {k: v for k, v in store["games"].items() if int(k.split("|")[0]) >= keep_from}
+    n_games = n_props = 0; markets_seen = set()
+    for ev in evs:
+        try: start = datetime.fromisoformat(str(ev["commence_time"]).replace("Z", "+00:00"))
+        except Exception: continue
+        if start <= NOW or start > soon: continue            # started games keep their last pregame lines
+        js = http_json(f"{PL_BASE}/sports/{sk}/events/{ev['id']}/odds?" + urllib.parse.urlencode(
+            {"apiKey": PROPLINE_KEY, "markets": ",".join(mk), "bookmakers": "fanduel,draftkings"}))
+        props = {}
+        for bk in (js or {}).get("bookmakers", []):
+            book = bk.get("key")
+            for m in bk.get("markets", []):
+                markets_seen.add(m.get("key"))
+                if (m.get("line_type") or "main") != "main" or m.get("suspended_at"): continue
+                stat = mk.get(m.get("key"))
+                if not stat: continue
+                for o in m.get("outcomes", []):
+                    pl, side, pt, pr = o.get("description"), o.get("name"), o.get("point"), o.get("price")
+                    if not pl or pt is None or pr is None or side not in ("Over", "Under"): continue
+                    rec = props.setdefault((pl, stat), {}).setdefault(book, {})
+                    if rec.get("line") not in (None, pt): continue   # keep one line per book
+                    rec["line"] = pt; rec["over" if side == "Over" else "under"] = pr
+        lines = []
+        for (pl, stat), books in props.items():
+            pick = next(((k, b) for k, b in (("fanduel", books.get("fanduel")), ("draftkings", books.get("draftkings"))) if b and "over" in b and "under" in b), None)
+            if not pick: continue
+            k, b = pick; d = books.get("draftkings") if k == "fanduel" else None
+            lines.append({"player": pl, "stat": stat, "line": b["line"], "over": b["over"], "under": b["under"], "book": "FanDuel" if k == "fanduel" else "DraftKings",
+                          **({"dk": [d["line"], d.get("over"), d.get("under")]} if d and "line" in d else {})})
+        key = f"{ymd(ev['commence_time'])}|{short_name(sport, ev['home_team'])}|{short_name(sport, ev['away_team'])}"
+        if lines:
+            store["games"][key] = {"start": ev["commence_time"], "at": NOW.isoformat(timespec="minutes"), "props": lines}
+            n_games += 1; n_props += len(lines)
+        if test and n_games <= 1 and lines: say(f"  sample {sport} props: {ev['away_team']} @ {ev['home_team']}: {json.dumps(lines[:3])}")
+    say(f"  {sport} props: {n_props} lines for {n_games} games (markets seen: {', '.join(sorted(x for x in markets_seen if x))[:200]})")
+    if test: return
+    store["updated"] = NOW.isoformat(timespec="seconds"); save(f"props/{sport}_lines.json", store)
+    # history: the last pregame snapshot per game is its closing prop line
+    for key, g in store["games"].items():
+        d = key.split("|")[0]; hp = f"props/hist/{sport}/{d}.json"; h = load(hp, {"games": {}}); h["games"][key] = g; save(hp, h)
+
+def nba_props_data():
+    """Player game logs, splits and tonight's projections for the NBA props screen."""
+    import props_nba as PN, pyarrow.parquet as pq
+    y = season_of("NBA", TODAY); es = y + 1          # ESPN labels NBA seasons by their ending year
+    def box(label):
+        path = os.path.join(ROOT, f".nba_pbox_{label}.parquet")
+        try:
+            urllib.request.urlretrieve(f"https://raw.githubusercontent.com/sportsdataverse/hoopR-nba-data/main/nba/player_box/parquet/player_box_{label}.parquet", path)
+            return PN.rows_from_box(pq.read_table(path).to_pylist())
+        finally:
+            if os.path.exists(path): os.remove(path)
+    prev, cur = box(es - 1), box(es)
+    st = PN.State(); byp = {}
+    for g in prev: byp.setdefault(g["pid"], []).append(g)
+    for pid, L in byp.items():
+        r, mpg = PN.season_rates(L); st.prev[pid] = {"rate": r, "mpg": mpg}
+    for g in cur: st.add(g)
+    # upcoming games (today and tomorrow) with lines
+    track = load("odds/NBA.json", {"events": {}})
+    today, tmrw = int(TODAY.strftime("%Y%m%d")), int((TODAY + timedelta(days=1)).strftime("%Y%m%d"))
+    games = {}
+    for e in track["events"].values():
+        if e.get("hs") is None and e.get("date") in (today, tmrw):
+            games[f"{e['date']}|{e['home']}|{e['away']}"] = {"date": e["date"], "home": e["home"], "away": e["away"], "sp": (e.get("last") or {}).get("sp")}
+    met = load("metrics/NBA.json", {"teams": {}})["teams"]
+    paces = [v["pace"] for v in met.values() if v.get("pace")]; lgp = sum(paces) / len(paces) if paces else 99.0
+    last = {}
+    for g in cur: last[g["pid"]] = g
+    def dnum(d): return date(d // 10000, d // 100 % 100, d % 100)
+    proj = {}
+    for key, gm in games.items():
+        out = {}
+        pf = ((met.get(gm["home"], {}).get("pace") or lgp) + (met.get(gm["away"], {}).get("pace") or lgp)) / 2 / lgp
+        for team, opp in ((gm["home"], gm["away"]), (gm["away"], gm["home"])):
+            for pid, lg_ in last.items():
+                if lg_["team"] != team or (dnum(gm["date"]) - dnum(lg_["date"])).days > 12: continue
+                b2b = (dnum(gm["date"]) - dnum(lg_["date"])).days == 1
+                p = PN.project(st, pid, lg_["pos"], team, opp, {"b2b": b2b, "spread_abs": abs(gm["sp"] or 0), "pace_f": pf})
+                if not p or p["min"] < 10: continue
+                out[lg_["player"]] = {"team": team, "opp": opp, "pos": lg_["pos"], "b2b": b2b, "pace_f": round(pf, 3), **p}
+        proj[key] = {"home": gm["home"], "away": gm["away"], "players": out}
+    # game logs and splits for every player who played in the last 30 days
+    cutoff = int((TODAY - timedelta(days=30)).strftime("%Y%m%d")); pl = {}
+    allrows = prev + cur
+    by = {}
+    for g in allrows: by.setdefault(g["pid"], []).append(g)
+    for pid, L in by.items():
+        C = [g for g in L if g["season"] == es]
+        if not C or C[-1]["date"] < cutoff: continue
+        nm = C[-1]["player"]
+        avg = lambda G, s: round(sum(g[s] for g in G) / len(G), 1) if G else None
+        sp = {}
+        for s in PN.STATS:
+            sp[s] = {"season": avg(C, s), "l10": avg(C[-10:], s), "l5": avg(C[-5:], s), "home": avg([g for g in C if g["home"]], s), "away": avg([g for g in C if not g["home"]], s)}
+        pl[nm] = {"team": C[-1]["team"], "pos": C[-1]["pos"], "gp": len(C), "mpg": avg(C, "min"),
+                  "log": [[g["date"], g["opp"], 1 if g["home"] else 0, round(g["min"]), int(g["pts"]), int(g["reb"]), int(g["ast"]), int(g["fg3"])] for g in L[-25:]],
+                  "splits": sp}
+    save("props/NBA_proj.json", {"updated": NOW.isoformat(timespec="seconds"), "cal": PN.CAL, "games": proj})
+    save("props/NBA_players.json", {"updated": NOW.isoformat(timespec="seconds"), "players": pl})
+    say(f"  NBA props data: projections for {sum(len(g['players']) for g in proj.values())} players in {len(proj)} games; logs for {len(pl)} players")
+
 # ------------------------------------------------------------------ index
 def write_index(state):
     idx = {"updated": NOW.isoformat(timespec="seconds"), "sports": {}, "notes": state.get("notes", {})}
@@ -1537,7 +1654,8 @@ def write_index(state):
                "model": os.path.exists(os.path.join(DATA, "model", f"{sport}.json")),
                "weather": os.path.exists(os.path.join(DATA, "weather", f"{sport}.json")),
                "best": os.path.exists(os.path.join(DATA, "odds", f"best_{sport}.json")),
-               "fd": os.path.exists(os.path.join(DATA, "odds", f"fd_{sport}.json"))}
+               "fd": os.path.exists(os.path.join(DATA, "odds", f"fd_{sport}.json")),
+               "props": os.path.exists(os.path.join(DATA, "props", f"{sport}_lines.json")) or os.path.exists(os.path.join(DATA, "props", f"{sport}_proj.json"))}
         for kind in ("api", "archive"):
             d = os.path.join(DATA, kind, sport)
             if os.path.isdir(d):
@@ -1633,6 +1751,9 @@ def main():
     for sp in ("NCAAB", "NCAAF"):
         if sp in sports and not args.test:
             guard(f"{sp} FanDuel", lambda sp=sp: fd_college(sp))
+    if "NBA" in sports:
+        if not args.test: guard("NBA props data", nba_props_data)
+        guard("NBA props lines", lambda: props_lines("NBA", test=args.test))
     if not args.odds_only:
         for sp, fn in (("NFL", nfl_metrics), ("NFL", nfl_injuries), ("NBA", nba_metrics), ("NCAAF", cfb_metrics), ("NCAAB", cbb_metrics)):
             if sp in sports and (sp not in ("NCAAF", "NCAAB") or CFBD_KEY):
