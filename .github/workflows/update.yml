@@ -47,6 +47,7 @@ jobs:
           CFBD_API_KEY: ${{ secrets.CFBD_API_KEY }}
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
           PLAYBOOK_API_KEY: ${{ secrets.PLAYBOOK_API_KEY }}
+          PROPLINE_API_KEY: ${{ secrets.PROPLINE_API_KEY }}
           MODE: ${{ github.event.inputs.mode || (github.event.schedule == '30 21 * * *' && 'odds') || (github.event.schedule == '0 16 * * 0' && 'nfl') || (github.event.schedule == '0 15 * * 6' && 'cfb') || ((github.event.schedule == '30 19 * * 0' || github.event.schedule == '30 22 * * 1,4') && 'nfl-odds') || 'full' }}
         run: |
           case "$MODE" in
