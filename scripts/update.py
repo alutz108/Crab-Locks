@@ -196,6 +196,7 @@ def lines_to_game(x, sport, extra=None):
             g["as"] = extra.get("awayPoints", extra.get("awayScore"))
     elif g["hc"] and g["ac"]:
         g["div"] = g["hc"] == g["ac"]
+    if g["hs"] == 0 and g["as"] == 0: g["hs"] = g["as"] = None   # 0-0 means not played (scheduled, postponed or cancelled)
     if g["hs"] is None or g["as"] is None:
         g["hs"] = g["as"] = None
         # upcoming: best number across sportsbooks (home spread: most points; away = minus the lowest home spread)
@@ -296,6 +297,12 @@ def fanduel_lines(ev):
             out["hml"] = oc[home].get("price"); out["aml"] = oc[away].get("price")
     return out or None
 
+def fd_keep(sport):
+    """FanDuel lines already saved: games that have started keep their last pregame number (closing line); stale ones drop."""
+    prev = load(f"odds/fd_{sport}.json", {"games": {}})["games"]
+    keep_from = int((TODAY - timedelta(days=3)).strftime("%Y%m%d"))
+    return {k: v for k, v in prev.items() if int(k.split("|")[0]) >= keep_from}
+
 def odds_budget(cost, priority="low"):
     """Keep The Odds API inside the free 500 credits a month: lower-priority calls stop first."""
     left = STATS.get("odds_credits_left")
@@ -323,13 +330,14 @@ def fd_college(sport):
         for n in names:
             if full.startswith(n + " ") and (best is None or len(n) > len(best)): best = n
         return best
-    out, miss = {}, 0
+    out, miss = fd_keep(sport), 0
     for ev in evs or []:
+        if datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00")) <= NOW: continue   # started: never take in-game odds
         fd = fanduel_lines(ev)
         if not fd: continue
         h, a = ours(ev["home_team"]), ours(ev["away_team"])
         if not h or not a: miss += 1; continue
-        out[f"{ymd(ev['commence_time'])}|{h}|{a}"] = fd
+        out[f"{ymd(ev['commence_time'])}|{h}|{a}"] = {**fd, "start": ev["commence_time"]}
     save(f"odds/fd_{sport}.json", {"updated": NOW.isoformat(timespec="seconds"), "games": out})
     say(f"  {sport} FanDuel: {len(out)} games ({miss} couldn’t be matched). Odds API credits left: {STATS['odds_credits_left']}")
 NFL_ABBR = {"Arizona Cardinals": "ARI", "Atlanta Falcons": "ATL", "Baltimore Ravens": "BAL", "Buffalo Bills": "BUF",
@@ -438,10 +446,11 @@ def odds_update(sport, with_scores, test=False):
                 pass
     say(f"  {sport}: {len(evs or [])} upcoming games priced, {n_new} new openers captured. Odds API credits left: {STATS['odds_credits_left']}")
     if not test:
-        fdo = {}
+        fdo = fd_keep(sport)
         for ev in evs or []:
+            if datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00")) <= NOW: continue   # started: keep the frozen pregame line
             fd = fanduel_lines(ev)
-            if fd: fdo[f"{ymd(ev['commence_time'])}|{short_name(sport, ev['home_team'])}|{short_name(sport, ev['away_team'])}"] = fd
+            if fd: fdo[f"{ymd(ev['commence_time'])}|{short_name(sport, ev['home_team'])}|{short_name(sport, ev['away_team'])}"] = {**fd, "start": ev["commence_time"]}
         save(f"odds/fd_{sport}.json", {"updated": NOW.isoformat(timespec="seconds"), "games": fdo})
         say(f"  {sport} FanDuel: {len(fdo)} games")
         bl = {}
@@ -1408,6 +1417,18 @@ def model_predictions(sport):
 # results leave them out (totals are unaffected).
 FLAG_T = {"NCAAF": (14, 7, 35, 3.0), "NCAAB": (12, 6, 30, 3.2)}
 
+def repair_zero_scores(sport):
+    """One-time fix: games saved as 0-0 were never played. Clear the score so nothing treats them as finals."""
+    n = 0
+    for f in sorted(os.listdir(os.path.join(DATA, "api", sport))) if os.path.isdir(os.path.join(DATA, "api", sport)) else []:
+        path = f"api/{sport}/{f}"; js = load(path, None)
+        if not js: continue
+        ch = 0
+        for g in js["games"]:
+            if g.get("hs") == 0 and g.get("as") == 0: g["hs"] = g["as"] = None; ch += 1
+        if ch: save(path, js); n += ch
+    say(f"  {sport} score repair: {n} games saved as 0-0 marked not played")
+
 def flag_reversed_lines(sport, seasons):
     import model as M
     T, F, cap, hfa = FLAG_T[sport]; total = 0
@@ -1624,6 +1645,9 @@ def main():
                 guard(f"{sp} model", lambda sp=sp: model_predictions(sp))
         if "NCAAB" in sports:
             guard("NCAAB model", model_predictions_cbb)
+        for sp in ("NCAAF", "NCAAB"):
+            if sp in sports and not state.get(f"zero_fix_v1_{sp}"):
+                guard(f"{sp} score repair", lambda sp=sp: repair_zero_scores(sp)); state[f"zero_fix_v1_{sp}"] = 1
         for sp in ("NCAAF", "NCAAB"):
             if sp not in sports: continue
             cur = season_of(sp, TODAY)
