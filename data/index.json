@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-16T01:16:52+00:00",
+ "updated": "2026-11-16T18:21:37+00:00",
  "sports": {
   "NFL": {
    "base": true,
@@ -11,7 +11,8 @@
    "model": true,
    "weather": true,
    "best": true,
-   "fd": true
+   "fd": true,
+   "props": false
   },
   "NCAAF": {
    "base": true,
@@ -38,7 +39,8 @@
    "model": true,
    "weather": true,
    "best": false,
-   "fd": true
+   "fd": true,
+   "props": false
   },
   "NBA": {
    "base": true,
@@ -46,6 +48,7 @@
     2026
    ],
    "archive": [
+    2023,
     2024,
     2025
    ],
@@ -55,7 +58,8 @@
    "model": false,
    "weather": false,
    "best": true,
-   "fd": true
+   "fd": true,
+   "props": true
   },
   "NCAAB": {
    "base": false,
@@ -82,7 +86,8 @@
    "model": true,
    "weather": false,
    "best": false,
-   "fd": true
+   "fd": true,
+   "props": false
   }
  },
  "notes": {}
