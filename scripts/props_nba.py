@@ -77,8 +77,9 @@ def project(st, pid, pos, team, opp, ctx):
     for s in STATS:
         base = st.lg_rate(pos, s)
         prior = (prev["rate"][s] * 0.7 + base * 0.3) if prev else base
-        r_season = (tot[s] + K_MIN * prior) / (msum + K_MIN)
-        r_l10 = (t10[s] + K_MIN * prior) / (m10s + K_MIN) if m10s else r_season
+        k = K_MIN if prev else K_MIN * 0.4      # no NBA history (rookies): trust their own numbers sooner instead of the league average
+        r_season = (tot[s] + k * prior) / (msum + k)
+        r_l10 = (t10[s] + k * prior) / (m10s + k) if m10s else r_season
         rate = 0.65 * r_season + 0.35 * r_l10
         # opponent vs this position (per minute allowed relative to league), shrunk by sample size
         a = st.allowed[opp][(pos, s)]; ng = len(st.team_games[opp])

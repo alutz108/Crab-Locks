@@ -1621,7 +1621,7 @@ def nba_props_data():
                 b2b = (dnum(gm["date"]) - dnum(lg_["date"])).days == 1
                 p = PN.project(st, pid, lg_["pos"], team, opp, {"b2b": b2b, "spread_abs": abs(gm["sp"] or 0), "pace_f": pf})
                 if not p or p["min"] < 10: continue
-                out[lg_["player"]] = {"team": team, "opp": opp, "pos": lg_["pos"], "b2b": b2b, "pace_f": round(pf, 3), **p}
+                out[lg_["player"]] = {"team": team, "opp": opp, "pos": lg_["pos"], "b2b": b2b, "pace_f": round(pf, 3), "prior": 1 if pid in st.prev else 0, **p}
         proj[key] = {"home": gm["home"], "away": gm["away"], "players": out}
     # game logs and splits for every player who played in the last 30 days
     cutoff = int((TODAY - timedelta(days=30)).strftime("%Y%m%d")); pl = {}
